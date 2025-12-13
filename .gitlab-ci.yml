@@ -16,6 +16,7 @@ pre-commit:
     PRE_COMMIT_HOME: $CI_PROJECT_DIR/.cache/pre-commit
     MISE_DATA_DIR: $CI_PROJECT_DIR/.cache/mise
     MISE_CACHE_DIR: $CI_PROJECT_DIR/.cache/mise/cache
+    GITHUB_TOKEN: $GITHUB_TOKEN  # mise will use this automatically
   cache:
     key: pre-commit-${CI_COMMIT_REF_SLUG}
     paths:
