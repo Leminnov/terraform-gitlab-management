@@ -11,7 +11,7 @@ locals {
       merge({
         for k_gk, k_gv in v : k_gk => k_gv if k_gk != "groups"
         }, {
-        key   = k
+        //key   = k
         group = k_g
       })
 
@@ -29,7 +29,7 @@ locals {
       merge({
         for k_gk, k_gv in v : k_gk => k_gv if k_gk != "projects"
         }, {
-        key     = k
+        //key     = k
         project = k_g
       })
 

@@ -7,6 +7,7 @@ module "gitlab_variables" {
 
   group_variables = {
     group_key_1 = {
+      key           = "group_key_1"
       groups        = ["group_1", "group_2", "group_3"]
       value         = "group_value_1"
       variable_type = "env_var"
@@ -17,6 +18,7 @@ module "gitlab_variables" {
 
   project_variables = {
     project_key_1 = {
+      key           = "project_key_1"
       projects      = ["project_1"]
       value         = "project_value_1"
       variable_type = "env_var"
@@ -24,6 +26,7 @@ module "gitlab_variables" {
       masked        = false
     }
     project_key_2 = {
+      key           = "project_key_2"
       projects      = ["project_1"]
       value         = "project_value_2"
       variable_type = "env_var"
