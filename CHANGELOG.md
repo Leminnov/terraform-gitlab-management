@@ -4,7 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Updates changelog config and entries
 - Updates CI and migrates to OpenTofu
 - Updates CI configuration and migrates to OpenTofu
 - Refactors CI config and adds entrypoint to ToFu image
@@ -17,9 +16,7 @@ All notable changes to this project will be documented in this file.
 - Updates opentofu to v1.11
 - Migrates to OpenTofu and Ubuntu 24.04
 - Updates pre-commit CI to use mise
-- Updates CHANGELOG with recent changes
 - Adds validate stage to pre-commit job
-- Automates CHANGELOG generation with git-chglog
 - Improves pre-commit configuration and adds OSV scanning
 - Automates release process with CI/CD pipelines
 - first commit

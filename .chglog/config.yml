@@ -3,13 +3,6 @@ template: CHANGELOG.tpl.md
 info:
   title: CHANGELOG
 options:
-  commits:
-    filters:
-      exclude:
-        - "^chore\\(changelog\\):"
-        - "^docs\\(changelog\\):"
-        - "^Update CHANGELOG"
-        - "^update changelog"
   header:
     pattern: "^(.*)$"
     pattern_maps:
