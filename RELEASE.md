@@ -21,40 +21,17 @@ Releases are **fully automated** when you push a semantic version tag. The CI/CD
 # 1. Ensure all changes are committed and pushed
 git status
 
-# 2. Update CHANGELOG.md with new version
-# Add a new section at the top:
-## [X.Y.Z] - YYYY-MM-DD
+# 2. CHANGELOG.md will be automatically updated by pre-commit hook
+# Just commit your changes normally
+git add .
+git commit -m "feat: add new feature"
+# Pre-commit hook automatically updates CHANGELOG.md
 
-### Added
-- New feature descriptions
-
-### Changed
-- Changed functionality
-
-### Fixed
-- Bug fixes
-
-# 3. Commit the changelog
-git add CHANGELOG.md
-git commit -m "docs: prepare release vX.Y.Z"
-git push
-
-# 4. Create and push the tag
+# 3. Create and push the tag
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin vX.Y.Z
 
 # The CI/CD pipeline will automatically create the release!
-```
-
-### Using the Makefile (Alternative)
-
-```bash
-# Generate changelog and create tag
-make changelog  # Generates CHANGELOG.md
-make release    # Creates semantic version tag
-
-# Push the tag to trigger release
-git push --follow-tags
 ```
 
 ## Semantic Versioning
@@ -98,7 +75,7 @@ git tag -a v2.0.0-alpha.1 -m "Alpha release"
 Before creating a release:
 
 - [ ] All CI/CD checks pass
-- [ ] CHANGELOG.md updated with version notes
+- [ ] CHANGELOG.md automatically generated (via pre-commit or CI)
 - [ ] Documentation updated (README.md, examples)
 - [ ] Version follows semantic versioning rules
 - [ ] All MRs/PRs for this release are merged
@@ -121,7 +98,7 @@ Located in `.gitlab/release.yml`, triggered on tag push:
    - Extracts changelog section for this version
    - Creates GitLab Release with:
      - Release title
-     - Changelog notes
+     - Changelog notes (from CHANGELOG.md)
      - Source archives (tar.gz, zip)
      - Link to CHANGELOG.md
 
@@ -190,17 +167,30 @@ git push origin vX.Y.Z+1
 
 ## Changelog Management
 
-### Using git-chglog (Automated)
+### Using git-cliff (Automated)
 
-The `make changelog` command uses [git-chglog](https://github.com/git-chglog/git-chglog):
+CHANGELOG generation is automated using [git-cliff](https://git-cliff.org):
 
+**Via Pre-commit Hook:**
 ```bash
-# Generate full changelog
-make changelog
-
-# Preview next version changelog
-git-chglog --next-tag v1.2.3 v1.2.3
+# CHANGELOG is automatically generated when you commit
+git commit -m "feat: add new feature"
+# Pre-commit hook runs git-cliff and updates CHANGELOG.md
 ```
+
+**Manual Generation:**
+```bash
+# Generate full changelog for all tags
+git-cliff --config .cliff.toml --output CHANGELOG.md
+
+# Generate changelog for specific tag
+git-cliff --config .cliff.toml --tag v1.2.3 --output CHANGELOG.md
+```
+
+**Configuration:**
+- Template: `.cliff.toml`
+- Only tagged releases are included (no unreleased commits)
+- Filters out merge commits, CHANGELOG commits, and [skip ci] commits
 
 ### Manual Changelog
 
