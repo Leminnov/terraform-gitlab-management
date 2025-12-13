@@ -1,3 +1,6 @@
+include:
+  - local: '.gitlab/release.yml'
+
 variables:
   TOOLBOX_PYTHON_IMAGE: "registry.gitlab.com/${GITLAB_GROUP_PATH}/containers/toolbox:v5.2.0"
 
