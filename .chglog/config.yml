@@ -1,0 +1,10 @@
+style: gitlab
+template: CHANGELOG.tpl.md
+info:
+  title: CHANGELOG
+  repository_url: https://gitlab.com/${GITLAB_GROUP_PATH}/terraform/modules/gitlab
+options:
+  header:
+    pattern: "^(.*)$"
+    pattern_maps:
+      - Subject
