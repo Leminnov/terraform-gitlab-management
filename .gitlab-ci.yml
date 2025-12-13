@@ -33,7 +33,7 @@ pre-commit:
     - |
       curl -fsSL https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64 \
         -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner
-    # Create initial tag if none exist (required by git-chglog)
+    # Create initial tag if none exist (required by git-cliff)
     - |
       if ! git describe --tags 2>/dev/null; then
         git tag v0.0.0 $(git rev-list --max-parents=0 HEAD) 2>/dev/null || true

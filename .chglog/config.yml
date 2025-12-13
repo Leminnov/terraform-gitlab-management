@@ -1,9 +1,0 @@
-style: gitlab
-template: CHANGELOG.tpl.md
-info:
-  title: CHANGELOG
-options:
-  header:
-    pattern: "^(.*)$"
-    pattern_maps:
-      - Subject
