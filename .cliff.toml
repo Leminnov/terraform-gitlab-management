@@ -12,14 +12,16 @@ All notable changes to this project will be documented in this file.\n
 # https://keats.github.io/tera/docs/#introduction
 body = """
 {% for release in releases -%}
-    ## [{{ release.version | trim_start_matches(pat="v") }}] - {{ release.timestamp | date(format="%Y-%m-%d") }}
-    {% for commit in release.commits %}
-    {%- if commit.scope -%}
-        - **{{ commit.scope }}:** {{ commit.message }}
-    {%- else -%}
-        - {{ commit.message }}
+    {%- if release.version -%}
+        ## [{{ release.version | trim_start_matches(pat="v") }}] - {{ release.timestamp | date(format="%Y-%m-%d") }}
+        {% for commit in release.commits %}
+        {%- if commit.scope -%}
+            - **{{ commit.scope }}:** {{ commit.message }}
+        {%- else -%}
+            - {{ commit.message }}
+        {%- endif -%}
+        {% endfor -%}
     {%- endif -%}
-    {% endfor -%}
 {% endfor %}
 """
 # remove the leading and trailing whitespace from the template
@@ -34,18 +36,18 @@ conventional_commits = false
 filter_unconventional = false
 # process each line of a commit as an individual commit
 split_commits = false
+# skip unreleased commits
+skip_tags = ""
+include_path = []
+exclude_path = []
+# Only include commits that are part of a tag (skip unreleased)
+tag_pattern = "v[0-9].*"
 # regex for preprocessing the commit messages
 commit_preprocessors = []
 # protect breaking changes from being skipped due to matching a skipping commit_parser
 protect_breaking_commits = false
 # filter out the commits that are not matched by commit parsers
 filter_commits = true
-# regex for matching git tags
-tag_pattern = "v[0-9].*"
-# regex for skipping tags
-skip_tags = ""
-# regex for ignoring tags
-ignore_tags = ""
 # sort the tags topologically
 topo_order = false
 # sort the commits inside sections by oldest/newest order
