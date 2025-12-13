@@ -7,7 +7,7 @@ variables:
 
 pre-commit:
   stage: validate
-  image: debian:bookworm-slim
+  image: ubuntu:24.04
   rules:
     - exists:
         - .pre-commit-config.yaml

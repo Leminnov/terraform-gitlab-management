@@ -13,15 +13,15 @@ stages:
 # VALIDATION STAGE - Run on all commits
 # =============================================================================
 
-validate:terraform:
+validate:opentofu:
   stage: validate
-  image: hashicorp/terraform:1.10.7
+  image: ghcr.io/opentofu/opentofu:1.9.0
   rules:
     - when: always
   script:
-    - terraform init -backend=false
-    - terraform validate
-    - terraform fmt -check -recursive
+    - tofu init -backend=false
+    - tofu validate
+    - tofu fmt -check -recursive
   cache:
     paths:
       - .terraform
