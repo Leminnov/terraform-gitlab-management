@@ -7,7 +7,7 @@ variables:
 
 pre-commit:
   stage: validate
-  image: ubuntu:24.04
+  image: ubuntu:25.10
   rules:
     - exists:
         - .pre-commit-config.yaml
