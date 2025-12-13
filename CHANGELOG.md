@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Updates CI and migrates to OpenTofu
 - Updates CI configuration and migrates to OpenTofu
 - Refactors CI config and adds entrypoint to ToFu image
 - Configures entrypoint for tflint image
