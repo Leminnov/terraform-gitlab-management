@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [11.0.0] - 2025-12-13
+- Adds explicit key assignment to variables
+
+Ensures that the 'key' attribute is explicitly assigned within the example variable definitions, improving clarity and consistency.
+
+Removes redundant key assignment within local variables as it is implicitly defined.
 ## [10.0.0] - 2025-12-13
 - Migrates CI/CD pipeline to GitLab
 
