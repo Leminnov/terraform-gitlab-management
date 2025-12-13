@@ -38,6 +38,7 @@ repos:
         args:
         - --assume-in-merge
     - id: end-of-file-fixer
+      exclude: ^CHANGELOG\.md$
 
 -   repo: https://github.com/antonbabenko/pre-commit-terraform.git
     rev: v1.103.0

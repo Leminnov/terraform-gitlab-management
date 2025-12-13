@@ -3,12 +3,11 @@ auto_install = true
 
 [tools]
 pre-commit = '4.3'
+git-chglog = '0.15.4'
 age = '1.2'
 sops = '3.11'
 shfmt = '3.12'
 yamlfmt = '0.20'
-postgres = "17"
-opentofu = '1.10'
-terraform-docs = '0.20'
+opentofu = '1.11'
+terraform-docs = '0.21.0'
 tflint = '0.56.0'
-terramate = '0.15'

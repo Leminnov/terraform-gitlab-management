@@ -1,97 +1,98 @@
-# Change Log
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
 {{ if .Versions -}}
-<a name="unreleased"></a>
 ## [Unreleased]
+
 {{ if .Unreleased.CommitGroups -}}
 {{ range .Unreleased.CommitGroups -}}
 ### {{ .Title }}
 {{ range .Commits -}}
-{{/* SKIPPING RULES - START */ -}}
-{{- if not (hasPrefix .Subject "Updated CHANGELOG") -}}
-{{- if not (contains .Subject "[ci skip]") -}}
-{{- if not (contains .Subject "[skip ci]") -}}
-{{- if not (hasPrefix .Subject "Merge pull request ") -}}
-{{- if not (hasPrefix .Subject "Added CHANGELOG") -}}
-{{- /* SKIPPING RULES - END */ -}}
+{{ if not (hasPrefix .Subject "Merge ") -}}
+{{ if not (contains .Subject "CHANGELOG") -}}
+{{ if not (contains .Subject "Changelog") -}}
+{{ if not (contains .Subject "changelog") -}}
+{{ if not (contains .Subject "chglog") -}}
+{{ if not (contains .Subject "[skip ci]") -}}
+{{ if not (contains .Subject "[ci skip]") -}}
 - {{ if .Scope }}**{{ .Scope }}:** {{ end }}{{ .Subject }}
-{{/* SKIPPING RULES - START */ -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
-{{/* SKIPPING RULES - END */ -}}
+{{ end -}}
+{{ end -}}
 {{ end }}
 {{ end -}}
-{{ else }}
+{{ else if .Unreleased.Commits -}}
 {{ range .Unreleased.Commits -}}
-{{/* SKIPPING RULES - START */ -}}
-{{- if not (hasPrefix .Subject "Updated CHANGELOG") -}}
-{{- if not (contains .Subject "[ci skip]") -}}
-{{- if not (contains .Subject "[skip ci]") -}}
-{{- if not (hasPrefix .Subject "Merge pull request ") -}}
-{{- if not (hasPrefix .Subject "Added CHANGELOG") -}}
-{{- /* SKIPPING RULES - END */ -}}
+{{ if not (hasPrefix .Subject "Merge ") -}}
+{{ if not (contains .Subject "CHANGELOG") -}}
+{{ if not (contains .Subject "Changelog") -}}
+{{ if not (contains .Subject "changelog") -}}
+{{ if not (contains .Subject "chglog") -}}
+{{ if not (contains .Subject "[skip ci]") -}}
+{{ if not (contains .Subject "[ci skip]") -}}
 - {{ if .Scope }}**{{ .Scope }}:** {{ end }}{{ .Subject }}
-{{/* SKIPPING RULES - START */ -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
-{{/* SKIPPING RULES - END */ -}}
+{{ end -}}
+{{ end -}}
 {{ end }}
-{{ end -}}
 {{ end -}}
 
 {{ range .Versions }}
-<a name="{{ .Tag.Name }}"></a>
 ## {{ if .Tag.Previous }}[{{ .Tag.Name }}]{{ else }}{{ .Tag.Name }}{{ end }} - {{ datetime "2006-01-02" .Tag.Date }}
+
 {{ if .CommitGroups -}}
 {{ range .CommitGroups -}}
 ### {{ .Title }}
 {{ range .Commits -}}
-{{/* SKIPPING RULES - START */ -}}
-{{- if not (hasPrefix .Subject "Updated CHANGELOG") -}}
-{{- if not (contains .Subject "[ci skip]") -}}
-{{- if not (contains .Subject "[skip ci]") -}}
-{{- if not (hasPrefix .Subject "Merge pull request ") -}}
-{{- if not (hasPrefix .Subject "Added CHANGELOG") -}}
-{{- /* SKIPPING RULES - END */ -}}
+{{ if not (hasPrefix .Subject "Merge ") -}}
+{{ if not (contains .Subject "CHANGELOG") -}}
+{{ if not (contains .Subject "Changelog") -}}
+{{ if not (contains .Subject "changelog") -}}
+{{ if not (contains .Subject "chglog") -}}
+{{ if not (contains .Subject "[skip ci]") -}}
+{{ if not (contains .Subject "[ci skip]") -}}
 - {{ if .Scope }}**{{ .Scope }}:** {{ end }}{{ .Subject }}
-{{/* SKIPPING RULES - START */ -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
-{{/* SKIPPING RULES - END */ -}}
+{{ end -}}
+{{ end -}}
 {{ end }}
 {{ end -}}
-{{ else }}
+{{ else if .Commits -}}
 {{ range .Commits -}}
-{{/* SKIPPING RULES - START */ -}}
-{{- if not (hasPrefix .Subject "Updated CHANGELOG") -}}
-{{- if not (contains .Subject "[ci skip]") -}}
-{{- if not (contains .Subject "[skip ci]") -}}
-{{- if not (hasPrefix .Subject "Merge pull request ") -}}
-{{- if not (hasPrefix .Subject "Added CHANGELOG") -}}
-{{- /* SKIPPING RULES - END */ -}}
+{{ if not (hasPrefix .Subject "Merge ") -}}
+{{ if not (hasPrefix .Subject "Updated CHANGELOG") -}}
+{{ if not (contains .Subject "CHANGELOG") -}}
+{{ if not (contains .Subject "Changelog") -}}
+{{ if not (contains .Subject "changelog") -}}
+{{ if not (contains .Subject "chglog") -}}
+{{ if not (contains .Subject "[skip ci]") -}}
+{{ if not (contains .Subject "[ci skip]") -}}
 - {{ if .Scope }}**{{ .Scope }}:** {{ end }}{{ .Subject }}
-{{/* SKIPPING RULES - START */ -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
 {{ end -}}
-{{/* SKIPPING RULES - END */ -}}
+{{ end -}}
+{{ end -}}
+{{ end -}}
 {{ end }}
 {{ end -}}
 
-{{- if .NoteGroups -}}
+{{ if .NoteGroups -}}
 {{ range .NoteGroups -}}
 ### {{ .Title }}
 {{ range .Notes }}
@@ -100,12 +101,4 @@ All notable changes to this project will be documented in this file.
 {{ end -}}
 {{ end -}}
 {{ end -}}
-
-{{- if .Versions }}
-[Unreleased]: {{ .Info.RepositoryURL }}/compare/{{ $latest := index .Versions 0 }}{{ $latest.Tag.Name }}...HEAD
-{{ range .Versions -}}
-{{ if .Tag.Previous -}}
-[{{ .Tag.Name }}]: {{ $.Info.RepositoryURL }}/compare/{{ .Tag.Previous.Name }}...{{ .Tag.Name }}
-{{ end -}}
-{{ end -}}
-{{ end -}}
+{{ end }}

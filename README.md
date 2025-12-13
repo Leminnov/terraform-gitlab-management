@@ -20,13 +20,13 @@ Terraform module which initialize Gitlab with:
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10.7 |
-| <a name="requirement_gitlab"></a> [gitlab](#requirement\_gitlab) | ~> 18.6.1 |
+| <a name="requirement_gitlab"></a> [gitlab](#requirement\_gitlab) | ~> 18.6 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_gitlab"></a> [gitlab](#provider\_gitlab) | 18.6.1 |
+| <a name="provider_gitlab"></a> [gitlab](#provider\_gitlab) | ~> 18.6 |
 
 ## Modules
 
