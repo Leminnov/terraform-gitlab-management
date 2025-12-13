@@ -26,7 +26,7 @@ Terraform module which initialize Gitlab with:
 
 | Name | Version |
 |------|---------|
-| <a name="provider_gitlab"></a> [gitlab](#provider\_gitlab) | ~> 18.6.1 |
+| <a name="provider_gitlab"></a> [gitlab](#provider\_gitlab) | 18.6.1 |
 
 ## Modules
 
