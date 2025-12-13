@@ -73,6 +73,7 @@ All notable changes to this project will be documented in this file.
 {{ else if .Commits -}}
 {{ range .Commits -}}
 {{ if not (hasPrefix .Subject "Merge ") -}}
+{{ if not (hasPrefix .Subject "Updated CHANGELOG") -}}
 {{ if not (contains .Subject "CHANGELOG") -}}
 {{ if not (contains .Subject "Changelog") -}}
 {{ if not (contains .Subject "changelog") -}}
