@@ -1,9 +1,18 @@
 # Gitlab Terraform Module
 
+[![Apache 2.0][apache-shield]][apache]
+[![Terraform][terraform-badge]][terraform-url]
+[![Latest Release][release-badge]][release-url]
+
 Terraform module which initialize Gitlab with:
 
 - Group Variables
 - Project Variables
+- Deploy Tokens
+- Pipeline Schedules
+- GitLab Runners
+- Group Access Tokens
+- Project Access Tokens
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -94,3 +103,9 @@ limitations under the License.
 [apache]: http://www.apache.org/licenses/LICENSE-2.0
 [apache-image]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 [apache-shield]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+
+[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.10.7-purple.svg
+[terraform-url]: https://www.terraform.io/downloads.html
+
+[release-badge]: https://img.shields.io/gitlab/v/release/leminnov/terraform/modules/gitlab?include_prereleases&sort=semver
+[release-url]: https://gitlab.com/leminnov/terraform/modules/gitlab/-/releases
