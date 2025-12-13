@@ -38,6 +38,7 @@ repos:
         args:
         - --assume-in-merge
     - id: end-of-file-fixer
+      exclude: ^CHANGELOG\.md$
 
 -   repo: https://github.com/antonbabenko/pre-commit-terraform.git
     rev: v1.103.0
@@ -45,3 +46,13 @@ repos:
     - id: terraform_fmt
     - id: terraform_docs
     - id: terraform_tflint
+
+# Run git-chglog first so end-of-file-fixer can normalize the output
+-   repo: local
+    hooks:
+    - id: git-chglog
+      name: Generate CHANGELOG
+      language: system
+      entry: git-chglog -o CHANGELOG.md
+      pass_filenames: false
+      always_run: true

@@ -2,38 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [Unreleased]
 
-### Added
-- Comprehensive output variables for all resources
-- Support for multiple groups/projects in group_access_tokens and project_access_tokens
-- Support for multiple groups in deploy_tokens
-- Apache 2.0 license
-- TFLint configuration
+- Improves pre-commit configuration and adds OSV scanning
+- Automates release process with CI/CD pipelines
+- first commit
 
-### Changed
-- Updated from CC BY-SA 4.0 to Apache License 2.0
-- Renamed `tokens_variables` to `deploy_tokens`
-- Output variable names now use underscores instead of hyphens
-- Enhanced outputs with detailed metadata and helper outputs
-- Removed `expiring_soon_tokens` output (caused perpetual diffs)
 
-### Fixed
-- Added missing `key` field to `deploy_tokens` transformation
-- Corrected output attributes to match actual GitLab provider resource schema
-- Fixed typos in example file
+## [v5.0.0] - 2025-12-13
 
-## [1.0.0] - Initial Release
+- Updates pre-commit config and Terraform versions
+- Updates deploy token configuration
 
-### Added
-- Initial module implementation
-- Support for GitLab group variables
-- Support for GitLab project variables
-- Support for GitLab deploy tokens
-- Support for GitLab pipeline schedules
-- Support for GitLab runners
-- Support for GitLab group access tokens
-- Support for GitLab project access tokens
+
+## [v4.3.0] - 2024-05-27
+
+- Gitlab project access token
+
+
+## [v4.2.0] - 2024-05-24
+
+- Create gitlab access token
+- D3-2070 - Scan "Gitlab" repo
+
+
+## [v4.1.0] - 2024-04-22
+
+- update output "gitlab-runner-token"
+
+
+## [v4.0.0] - 2024-04-22
+
+- fix pipeline_schedule_id
+- create gitlab runner
+- fix previous pre-comiit
+
+
+## [v3.1.0] - 2024-01-31
+
+- add support for multiple variables
+- add scheduled pipeline
+
+
+## [v3.0.0] - 2023-12-11
+
+- change sensitive to true
+- adding username as output
+- sensitive output
+- D3-2610 - Output For VAULT
+- adding output
+- D3-2608 - Gitlab-Deploy-Token
+
+
+## v2.0.1 - 2023-01-06
+
+- lic and pre-commit
+- new major release
+- Initial commit
+
+

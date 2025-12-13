@@ -4,6 +4,7 @@ include:
 variables:
   PYTHON_IMAGE: "python:3.12-slim"
   OSV_SCANNER_VERSION: "1.9.1"
+  GIT_CHGLOG_VERSION: "0.15.4"
 
 pre-commit:
   image: $PYTHON_IMAGE
@@ -24,6 +25,9 @@ pre-commit:
     - |
       curl -fsSL https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64 \
         -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner
+    - |
+      curl -fsSL https://github.com/git-chglog/git-chglog/releases/download/v${GIT_CHGLOG_VERSION}/git-chglog_${GIT_CHGLOG_VERSION}_linux_amd64.tar.gz \
+        | tar xz -C /usr/local/bin git-chglog
   script:
     - |
       if [ "${SKIP_OSV_SCAN:-false}" = "true" ]; then
