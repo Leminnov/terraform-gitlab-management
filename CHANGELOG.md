@@ -8,6 +8,13 @@ All notable changes to this project will be documented in this file.
 Migrates the CI/CD pipeline from GitHub Actions to GitLab CI, enabling release process handling via GitLab features.
 
 Removes the previous GitHub Actions workflow and introduces corresponding GitLab CI configuration files.
+
+Ensures .gitlab/global.yml ends with a newline.
+- Migrates CI/CD pipeline to GitLab
+
+Migrates the CI/CD pipeline from GitHub Actions to GitLab CI, enabling release process handling via GitLab features.
+
+Removes the previous GitHub Actions workflow and introduces corresponding GitLab CI configuration files.
 - fix(gitlab): Ensure .gitlab/global.yml ends with a newline
 - Migrates CI/CD pipeline to GitLab
 
