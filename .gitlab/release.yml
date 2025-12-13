@@ -15,7 +15,9 @@ stages:
 
 validate:opentofu:
   stage: validate
-  image: ghcr.io/opentofu/opentofu:1.11
+  image:
+    name: ghcr.io/opentofu/opentofu:1.11
+    entrypoint: [""]
   rules:
     - when: always
   script:
