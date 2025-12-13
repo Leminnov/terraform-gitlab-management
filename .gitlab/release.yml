@@ -37,7 +37,7 @@ validate:tflint:
     - when: always
   script:
     - tflint --init
-    - tflint --chdir=. --recursive
+    - tflint --recursive
 
 # =============================================================================
 # RELEASE STAGE - Only on tags
