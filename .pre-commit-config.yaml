@@ -47,12 +47,12 @@ repos:
     - id: terraform_docs
     - id: terraform_tflint
 
-# Run git-cliff first so end-of-file-fixer can normalize the output
+# Run git-cliff to generate CHANGELOG only for tagged releases
 -   repo: local
     hooks:
     - id: git-cliff
       name: Generate CHANGELOG
       language: system
-      entry: git cliff --output CHANGELOG.md
+      entry: bash -c 'git-cliff --tag $(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0) --output CHANGELOG.md || true'
       pass_filenames: false
       always_run: true
