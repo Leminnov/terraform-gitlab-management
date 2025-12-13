@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Adds validate stage to pre-commit job
+- Automates CHANGELOG generation with git-chglog
 - Improves pre-commit configuration and adds OSV scanning
 - Automates release process with CI/CD pipelines
 - first commit
