@@ -46,6 +46,4 @@ pre-commit:
       else
         osv-scanner -r .
       fi
-    - terraform-docs --version
-    - pre-commit install
     - pre-commit run -a -v --show-diff-on-failure --color always
