@@ -2,8 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
 
+## [v10.0.0] - 2025-12-13
+
+- Auto stash before rebase of "develop"
+- ci: Optimize pre-commit job script by removing redundant commands
+- ci: Update pre-commit job image to Ubuntu 24.04 LTS
+- Update README to match CI terraform-docs output
+- Relax gitlab provider version constraint
+- Enables pre-commit and simplifies tflint
+- Updates terraform-docs version
+- Updates pre-commit image version
+- Updates dependencies
+- Updates gitlab provider version constraint.
+- Adds terraform-docs version check
+- Improves pre-commit job output
 - Updates CI and migrates to OpenTofu
 - Updates CI configuration and migrates to OpenTofu
 - Refactors CI config and adds entrypoint to ToFu image

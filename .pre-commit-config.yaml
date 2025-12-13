@@ -46,3 +46,13 @@ repos:
     - id: terraform_fmt
     - id: terraform_docs
     - id: terraform_tflint
+
+# Run git-chglog first so end-of-file-fixer can normalize the output
+-   repo: local
+    hooks:
+    - id: git-chglog
+      name: Generate CHANGELOG
+      language: system
+      entry: git-chglog -o CHANGELOG.md
+      pass_filenames: false
+      always_run: true
