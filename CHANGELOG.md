@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 ## [10.0.0] - 2025-12-13
+- fix(gitlab): Ensure .gitlab/global.yml ends with a newline
+- Migrates CI/CD pipeline to GitLab
+
+This commit migrates the CI/CD pipeline from GitHub Actions to GitLab CI.
+The release process is now handled by GitLab CI, leveraging its features
+for validation, release creation, and registry notification.
+
+The previous GitHub Actions workflow is removed, and corresponding GitLab
+CI configuration files are added to define the pipeline stages and jobs.
 - Auto stash before rebase of "develop"
 - ci: Optimize pre-commit job script by removing redundant commands
 - ci: Update pre-commit job image to Ubuntu 24.04 LTS
