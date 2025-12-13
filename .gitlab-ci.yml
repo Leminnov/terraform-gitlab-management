@@ -21,7 +21,7 @@ pre-commit:
     paths:
       - $CI_PROJECT_DIR/.cache
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+    - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3
     # Install mise
     - curl -fsSL https://mise.run | sh
     - export PATH="$HOME/.local/bin:$PATH"
