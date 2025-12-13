@@ -46,4 +46,4 @@ pre-commit:
       else
         osv-scanner -r .
       fi
-    - pre-commit run -a
+    - pre-commit run -a -v --show-diff-on-failure --color always
