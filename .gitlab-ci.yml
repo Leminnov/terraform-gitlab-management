@@ -2,30 +2,33 @@ include:
   - local: '.gitlab/release.yml'
 
 variables:
-  TOOLBOX_PYTHON_IMAGE: "registry.gitlab.com/${GITLAB_GROUP_PATH}/containers/toolbox:v5.2.0"
+  PYTHON_IMAGE: "python:3.12-slim"
+  OSV_SCANNER_VERSION: "1.9.1"
 
 pre-commit:
-  image: $TOOLBOX_PYTHON_IMAGE
+  image: $PYTHON_IMAGE
   rules:
-  - when: always
-  # Run the job only when the file `.pre-commit-config.yaml` exist in the repo
-  - exists:
-      - .pre-commit-config.yaml
+    - exists:
+        - .pre-commit-config.yaml
+      when: always
   variables:
     PRE_COMMIT_HOME: $CI_PROJECT_DIR/.cache/pre-commit
-  # Enable Caching for pre-commit
   cache:
-    key: pre-commit
+    key: pre-commit-${CI_COMMIT_REF_SLUG}
     paths:
       - $CI_PROJECT_DIR/.cache
+      - /root/.cache/pip
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates
+    - pip install --no-cache-dir pre-commit
+    - |
+      curl -fsSL https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64 \
+        -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner
   script:
-    - >
-      if [ $SKIP_OSV_SCAN == true ]; then
-
-        echo "Skipping OSV Scanner: $SKIP_OSV_SCAN"
-        exit 0
+    - |
+      if [ "${SKIP_OSV_SCAN:-false}" = "true" ]; then
+        echo "Skipping OSV Scanner"
+      else
+        osv-scanner -r .
       fi
-    #osv-scanner
-    - osv-scanner -r .
-    # Trigger pre-commit checks
     - pre-commit run -a
