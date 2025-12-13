@@ -28,12 +28,12 @@ validate:opentofu:
 
 validate:tflint:
   stage: validate
-  image: ghcr.io/terraform-linters/tflint:latest
+  image: ghcr.io/terraform-linters/tflint:v0.56.0
   rules:
     - when: always
   script:
     - tflint --init
-    - tflint --recursive
+    - tflint --chdir=. --recursive
 
 # =============================================================================
 # RELEASE STAGE - Only on tags
