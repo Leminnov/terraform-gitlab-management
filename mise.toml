@@ -11,3 +11,9 @@ yamlfmt = '0.20'
 opentofu = '1.11'
 terraform-docs = '0.21.0'
 tflint = '0.56.0'
+
+[tasks.changelog]
+description = "Update CHANGELOG.md (fetches all tags first)"
+run = '''
+git-cliff --config .cliff.toml --output CHANGELOG.md
+'''
