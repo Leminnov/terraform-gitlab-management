@@ -14,6 +14,38 @@ Terraform module which initialize Gitlab with:
 - Group Access Tokens
 - Project Access Tokens
 
+## Usage
+
+```hcl
+module "gitlab_management" {
+  source  = "gitlab.com/leminnov/terraform/modules/gitlab-management"
+  version = "~> 1.0"
+
+  group_variables = {
+    pipeline_log_level = {
+      key           = "PIPELINE_LOG_LEVEL"
+      groups        = ["my-org/platform"]
+      value         = "info"
+      variable_type = "env_var"
+      protected     = false
+      masked        = false
+    }
+  }
+}
+```
+
+See [`examples/basic`](examples/basic) for the simplest usage, or [`examples/complete`](examples/complete) for every input exercised together.
+
+## Documentation
+
+| File | Purpose |
+|------|---------|
+| [README.md](README.md) | This file — overview, usage, inputs/outputs |
+| [SECURITY.md](SECURITY.md) | Security considerations, secret handling, reporting vulnerabilities |
+| [TESTING.md](TESTING.md) | How to run tests locally and in CI |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
