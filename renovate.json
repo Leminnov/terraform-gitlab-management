@@ -1,0 +1,83 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":preserveSemverRanges",
+    ":dependencyDashboard",
+    "security:openssf-scorecard",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Europe/Paris",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": ["dependencies", "renovate"],
+  "rangeStrategy": "bump",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "enabled": true,
+    "schedule": ["at any time"]
+  },
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Group all mise tool bumps into a single PR",
+      "matchManagers": ["mise"],
+      "groupName": "mise tools"
+    },
+    {
+      "description": "Group all Terraform provider bumps",
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["required_provider"],
+      "groupName": "terraform providers"
+    },
+    {
+      "description": "Group all GitLab CI image bumps",
+      "matchManagers": ["gitlabci"],
+      "groupName": "gitlab-ci images"
+    },
+    {
+      "description": "Group pre-commit hook bumps",
+      "matchManagers": ["pre-commit"],
+      "groupName": "pre-commit hooks"
+    },
+    {
+      "description": "Pin GitHub Actions by digest",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    },
+    {
+      "description": "Automerge patch-level bumps for dev tooling",
+      "matchManagers": ["mise", "pre-commit", "gitlabci"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "description": "Never automerge the GitLab provider — infra blast radius",
+      "matchPackageNames": ["gitlabhq/gitlab"],
+      "automerge": false
+    }
+  ],
+  "regexManagers": [
+    {
+      "description": "Pin versions embedded in .gitlab/global.yml",
+      "fileMatch": ["^\\.gitlab/global\\.yml$"],
+      "matchStrings": [
+        "MISE_VERSION: \"(?<currentValue>[0-9.]+)\"",
+        "OSV_SCANNER_VERSION: \"(?<currentValue>[0-9.]+)\"",
+        "GIT_CLIFF_VERSION: \"(?<currentValue>[0-9.]+)\"",
+        "GITLEAKS_VERSION: \"(?<currentValue>[0-9.]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "jdx/mise"
+    }
+  ]
+}

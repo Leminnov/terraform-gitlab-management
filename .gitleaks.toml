@@ -1,0 +1,36 @@
+# gitleaks configuration for the gitlab-management module.
+# Extends the upstream default ruleset with allowlists for example/test
+# files that intentionally carry placeholder values.
+#
+# Docs: https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow placeholder values in examples, tests, and docs"
+
+paths = [
+  '''examples/.*''',
+  '''tests/.*\.tftest\.hcl''',
+  '''CHANGELOG\.md''',
+  '''SECURITY\.md''',
+  '''README\.md''',
+  '''TESTING\.md''',
+  '''\.gitleaks\.toml''',
+]
+
+regexes = [
+  # Obvious placeholder values used in documentation and examples
+  '''change-me''',
+  '''dummy-test-token''',
+  '''<token-with-api-scope>''',
+  '''<group-id>''',
+  '''example-username''',
+]
+
+stopwords = [
+  "example",
+  "placeholder",
+  "dummy",
+]

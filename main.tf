@@ -15,20 +15,19 @@ resource "gitlab_project_variable" "this" {
   key           = each.value.key
   project       = each.value.project
   value         = each.value.value
-  protected     = each.value.protected
   variable_type = each.value.variable_type
+  protected     = each.value.protected
   masked        = each.value.masked
 }
 
 resource "gitlab_deploy_token" "this" {
   for_each = local.deploy_tokens
 
-  group      = try(each.value.group, null)
+  group      = each.value.group
   name       = each.value.name
-  username   = try(each.value.username, null)
-  expires_at = try(each.value.expires_at, null)
-
-  scopes = each.value.scopes
+  username   = each.value.username
+  expires_at = each.value.expires_at
+  scopes     = each.value.scopes
 }
 
 resource "gitlab_pipeline_schedule" "this" {
@@ -48,7 +47,8 @@ resource "gitlab_pipeline_schedule_variable" "this" {
   pipeline_schedule_id = gitlab_pipeline_schedule.this[each.value.pipeline_schedule].pipeline_schedule_id
   key                  = each.value.key
   value                = each.value.value
-  depends_on           = [gitlab_pipeline_schedule.this]
+
+  depends_on = [gitlab_pipeline_schedule.this]
 }
 
 resource "gitlab_user_runner" "this" {
@@ -56,11 +56,11 @@ resource "gitlab_user_runner" "this" {
 
   runner_type     = each.value.runner_type
   description     = each.value.description
-  group_id        = try(each.value.group_id, null)
-  project_id      = try(each.value.project_id, null)
+  group_id        = each.value.group_id
+  project_id      = each.value.project_id
   access_level    = each.value.access_level
   tag_list        = each.value.tag_list
-  maximum_timeout = try(each.value.maximum_timeout, null)
+  maximum_timeout = each.value.maximum_timeout
   paused          = each.value.paused
   untagged        = each.value.untagged
   locked          = each.value.locked
@@ -72,9 +72,8 @@ resource "gitlab_group_access_token" "this" {
   group        = each.value.group
   name         = each.value.name
   expires_at   = each.value.expires_at
-  access_level = try(each.value.access_level, null)
-
-  scopes = each.value.scopes
+  access_level = each.value.access_level
+  scopes       = each.value.scopes
 }
 
 resource "gitlab_project_access_token" "this" {
@@ -83,7 +82,6 @@ resource "gitlab_project_access_token" "this" {
   project      = each.value.project
   name         = each.value.name
   expires_at   = each.value.expires_at
-  access_level = try(each.value.access_level, null)
-
-  scopes = each.value.scopes
+  access_level = each.value.access_level
+  scopes       = each.value.scopes
 }
