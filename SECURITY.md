@@ -49,3 +49,15 @@ The Terraform state for this module contains all tokens created by GitLab in pla
 - Use the smallest `access_level` and `scopes` that satisfy the consumer's needs.
 - Prefer project-scoped tokens over group-scoped tokens where project-level access suffices.
 - Set an explicit `expires_at` on every access token; avoid perpetual tokens.
+- The module validates `expires_at` format, rejects unknown scopes, and requires non-empty `groups`/`projects`/`scopes`. See `variables.tf` for the canonical allowed-scope lists.
+
+## Supply Chain
+
+- Tool versions (OpenTofu, tflint, terraform-docs, pre-commit, gitleaks, trivy, osv-scanner, git-cliff) are pinned in `mise.toml` and the CI images in `.gitlab/release.yml`. Renovate (`renovate.json`) opens grouped update PRs weekly so drift stays visible.
+- Every commit runs:
+  - `osv-scanner` — OSV/GHSA vulnerabilities in dependencies
+  - `trivy config` — IaC misconfiguration scan (fails on HIGH+CRITICAL)
+  - `gitleaks detect` — secret pattern scan with a curated allowlist in `.gitleaks.toml`
+  - `tfsec`-style rules via tflint's recommended preset
+- Release tags produce a SHA256 checksum manifest (`SHA256SUMS.txt`) over all tracked HCL/YAML/TOML/MD files, published as a release asset alongside the source archives.
+- All pipeline stages (`pre-commit`, `validate:opentofu`, `validate:tflint`, `validate:tftest`, `scan:trivy`, `scan:gitleaks`, `verify:changelog`) must pass before `create:release` runs — no bypass path.

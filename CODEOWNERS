@@ -1,0 +1,31 @@
+# GitLab CODEOWNERS file
+# https://docs.gitlab.com/ee/user/project/codeowners/
+#
+# Lines that start with `#` are ignored. Each line matches file patterns and
+# assigns owners. At least one owner per entry must approve a merge request
+# that touches matching files when code-owner approval is required.
+
+# Default — all changes require a platform engineer's approval.
+* @leminnov/platform
+
+# Terraform configuration and module logic
+*.tf           @leminnov/platform
+*.tftest.hcl   @leminnov/platform
+
+# CI/CD pipelines and release tooling
+/.gitlab/                    @leminnov/platform @leminnov/security
+/.gitlab-ci.yml              @leminnov/platform @leminnov/security
+/.pre-commit-config.yaml     @leminnov/platform
+/.cliff.toml                 @leminnov/platform
+/mise.toml                   @leminnov/platform
+
+# Security-critical files require security team review
+/SECURITY.md                 @leminnov/security
+/.gitleaks.toml              @leminnov/security
+/renovate.json               @leminnov/security
+
+# Docs
+/README.md        @leminnov/platform
+/TESTING.md       @leminnov/platform
+/CONTRIBUTING.md  @leminnov/platform
+/CHANGELOG.md     @leminnov/platform

@@ -45,8 +45,9 @@ The GitLab CI pipeline runs on every commit:
 - `validate:opentofu` — `tofu init -backend=false`, `tofu validate`, `tofu fmt -check -recursive`
 - `validate:tflint` — `tflint --recursive`
 - `validate:tftest` — `tofu test` (plan-level, no GitLab calls)
-- `pre-commit` — all hooks including `terraform_fmt`, `terraform_docs`, `terraform_tflint`
-- `scan:trivy` — IaC misconfiguration scan
+- `pre-commit` — all hooks including `terraform_fmt`, `terraform_docs`, `terraform_tflint`, `terraform_validate`, `terraform_trivy`, `gitleaks`
+- `scan:trivy` — IaC misconfiguration scan (HIGH+CRITICAL fails the pipeline)
+- `scan:gitleaks` — secret detection against the working tree
 
 On semantic version tags (`vX.Y.Z`):
 

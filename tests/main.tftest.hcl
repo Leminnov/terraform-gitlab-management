@@ -256,3 +256,191 @@ run "invalid_group_access_token_level_is_rejected" {
     var.gitlab_group_access_token,
   ]
 }
+
+# ---------------------------------------------------------------------------
+# Tighter production validations added in Phase 2
+# ---------------------------------------------------------------------------
+
+run "empty_groups_list_is_rejected" {
+  command = plan
+
+  variables {
+    group_variables = {
+      bad = {
+        key           = "K"
+        groups        = []
+        value         = "v"
+        variable_type = "env_var"
+      }
+    }
+  }
+
+  expect_failures = [
+    var.group_variables,
+  ]
+}
+
+run "invalid_variable_key_is_rejected" {
+  command = plan
+
+  variables {
+    group_variables = {
+      bad = {
+        key           = "123-invalid"
+        groups        = ["org/a"]
+        value         = "v"
+        variable_type = "env_var"
+      }
+    }
+  }
+
+  expect_failures = [
+    var.group_variables,
+  ]
+}
+
+run "invalid_deploy_token_scope_is_rejected" {
+  command = plan
+
+  variables {
+    deploy_tokens = {
+      bad = {
+        groups = ["org/a"]
+        name   = "bad"
+        scopes = ["make_coffee"]
+      }
+    }
+  }
+
+  expect_failures = [
+    var.deploy_tokens,
+  ]
+}
+
+run "invalid_access_token_scope_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_group_access_token = {
+      bad = {
+        groups       = ["org/a"]
+        name         = "bad"
+        expires_at   = "2099-12-31"
+        access_level = "developer"
+        scopes       = ["root_on_the_server"]
+      }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_group_access_token,
+  ]
+}
+
+run "invalid_expires_at_format_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_project_access_token = {
+      bad = {
+        projects     = ["org/a/web"]
+        name         = "bad"
+        expires_at   = "not-a-date"
+        access_level = "developer"
+        scopes       = ["api"]
+      }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_project_access_token,
+  ]
+}
+
+run "invalid_cron_is_rejected" {
+  command = plan
+
+  variables {
+    pipeline_schedules = {
+      bad = {
+        project     = "org/a/web"
+        description = "bad"
+        ref         = "main"
+        cron        = "0 2 * *" # only 4 fields
+        active      = true
+      }
+    }
+  }
+
+  expect_failures = [
+    var.pipeline_schedules,
+  ]
+}
+
+run "tagged_runner_with_empty_tag_list_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_runners = {
+      bad = {
+        runner_type  = "group_type"
+        description  = "tagged runner with no tags"
+        group_id     = "1"
+        access_level = "not_protected"
+        tag_list     = []
+        paused       = false
+        untagged     = false
+        locked       = false
+      }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_runners,
+  ]
+}
+
+run "group_runner_without_group_id_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_runners = {
+      bad = {
+        runner_type  = "group_type"
+        description  = "missing group_id"
+        access_level = "not_protected"
+        tag_list     = ["x"]
+        paused       = false
+        untagged     = false
+        locked       = false
+      }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_runners,
+  ]
+}
+
+run "maximum_timeout_below_600_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_runners = {
+      bad = {
+        runner_type     = "instance_type"
+        description     = "timeout too short"
+        access_level    = "not_protected"
+        tag_list        = []
+        maximum_timeout = 120
+        paused          = false
+        untagged        = true
+        locked          = false
+      }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_runners,
+  ]
+}

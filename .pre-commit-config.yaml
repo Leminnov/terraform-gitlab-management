@@ -9,9 +9,12 @@ default_install_hook_types:
     - post-merge
     - post-rewrite
 
+default_language_version:
+    python: python3.14
+
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0  # this is optional, use `pre-commit autoupdate` to get the latest rev!
+    rev: v6.0.0
     hooks:
     # Verify YAML syntax
     -   id: check-yaml
@@ -19,8 +22,11 @@ repos:
         description: "Verify YAML syntax"
         args:
         - --allow-multiple-documents
-    - id: check-json
-    - id: detect-private-key
+    -   id: check-json
+    -   id: detect-private-key
+    -   id: detect-aws-credentials
+        args:
+        - --allow-missing-credentials
     # Trims trailing whitespaces
     -   id: trailing-whitespace
         name: "Trailing Whitespaces"
@@ -37,12 +43,32 @@ repos:
         description: "Check for files that contain merge conflict strings."
         args:
         - --assume-in-merge
-    - id: end-of-file-fixer
-      exclude: ^CHANGELOG\.md$
+    -   id: end-of-file-fixer
+        exclude: ^CHANGELOG\.md$
+    # Prevent accidental commit of large binaries (e.g., state backups)
+    -   id: check-added-large-files
+        args:
+        - --maxkb=500
+    # Prevent case-only filename collisions
+    -   id: check-case-conflict
+    # Parseable executables have a shebang
+    -   id: check-executables-have-shebangs
+    # TOML validation
+    -   id: check-toml
+
+-   repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+    -   id: gitleaks
 
 -   repo: https://github.com/antonbabenko/pre-commit-terraform.git
-    rev: v1.103.0
+    rev: v1.105.0
     hooks:
-    - id: terraform_fmt
-    - id: terraform_docs
-    - id: terraform_tflint
+    -   id: terraform_fmt
+    -   id: terraform_docs
+    -   id: terraform_tflint
+    -   id: terraform_validate
+        exclude: ^tests/
+    -   id: terraform_trivy
+        args:
+        - --args=--severity HIGH,CRITICAL --exit-code 1

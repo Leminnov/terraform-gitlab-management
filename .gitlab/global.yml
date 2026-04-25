@@ -1,8 +1,10 @@
 variables:
   # Version detection from git tags
   GIT_DEPTH: 0  # Full history for proper tag detection
-  MISE_VERSION: "2024.12.14"
-  OSV_SCANNER_VERSION: "1.9.1"
+  MISE_VERSION: "2026.4.20"
+  OSV_SCANNER_VERSION: "2.3.5"
+  GIT_CLIFF_VERSION: "2.12.0"
+  GITLEAKS_VERSION: "8.30.1"
 
 stages:
   - validate
