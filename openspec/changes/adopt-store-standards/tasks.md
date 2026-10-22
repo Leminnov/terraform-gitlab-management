@@ -28,7 +28,7 @@
   - Every job has a `timeout`; no `when: always`.
 
   Verify YAML with `pre-commit run check-yaml --all-files`, and check that each image tag exists in its registry (`curl` on the registry manifest API).
-- [ ] 2.3 Add `timeout: 5m` to `.gitlab/specs.yml`. Verify the merge request pipeline of MR 1 runs green: pre-commit, validate:specs, validate:opentofu ×2, validate:examples ×2, validate:tflint, security:trivy and security:gitleaks.
+- [x] 2.3 Add `timeout: 5m` to `.gitlab/specs.yml`. Verify the merge request pipeline of MR 1 runs green: pre-commit, validate:specs, validate:opentofu ×2, validate:examples ×2, validate:tflint, security:trivy and security:gitleaks.
 
 ## 3. Provider 19.5, deploy token migration and unit suite base (MR 2)
 
