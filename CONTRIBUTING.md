@@ -42,6 +42,10 @@ All commits are automatically validated by pre-commit hooks. These hooks will:
 - Detect private keys
 - Check YAML/JSON syntax
 
+### Planning Changes
+
+For a behaviour change, plan it as an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change before writing HCL: `/openspec-propose` in Claude Code or OpenCode creates `openspec/changes/<name>/` with a proposal, delta specs, a design and tasks; `openspec/specs/` holds the current specification. Implement with `/openspec-apply-change`, then `/openspec-archive-change` merges the deltas into the main specs. The engineering standards are OpenSpec stores referenced from `openspec/config.yaml` with a pinned tag; run `mise run spec-setup` once per machine to register them ([AGENTS.md](AGENTS.md) explains when to read them), and `mise run spec-validate` before pushing.
+
 ### Making Changes
 
 1. Create a feature branch

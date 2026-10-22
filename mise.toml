@@ -14,6 +14,13 @@ tflint = '0.62.0'
 python = '3.13'
 gitleaks = '8.30.1'
 trivy = '0.70.0'
+# Runtime of the openspec CLI and required by mise's npm backend to install
+# it; same major as the node image of .gitlab/specs.yml.
+node = '24.21.0'
+# Spec-driven development CLI (openspec/, .claude/skills/openspec-*). The
+# skills shell out to `openspec`, so it must be on PATH. Keep equal to
+# OPENSPEC_VERSION in .gitlab/global.yml.
+"npm:@fission-ai/openspec" = '1.14.3'
 
 [tasks.rm-cache]
 run = 'find . -type d -name ".terramate-cache" -prune -exec rm -rf {} \;'
@@ -37,3 +44,13 @@ description = "Update CHANGELOG.md (fetches all tags first)"
 run = '''
 git-cliff --config .cliff.toml --output CHANGELOG.md
 '''
+
+[tasks.spec-validate]
+description = "Validate OpenSpec specs and change proposals (openspec validate --all --strict)"
+run = 'openspec validate --all --strict'
+
+# The stores are the `references:` of openspec/config.yaml; registered once per
+# machine, reusing a ghorg checkout or cloning into ${OPENSPEC_STORES_DIR:-~/openspec}.
+[tasks.spec-setup]
+description = "Register the OpenSpec stores referenced by openspec/config.yaml (clone if needed), then openspec doctor"
+run = 'scripts/openspec-setup.sh'

@@ -45,6 +45,7 @@ See [`examples/basic`](examples/basic) for the simplest usage, or [`examples/com
 | [TESTING.md](TESTING.md) | How to run tests locally and in CI |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [openspec/](openspec/) | Specification of the module's behaviour and planned changes |
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
