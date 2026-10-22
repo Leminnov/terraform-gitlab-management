@@ -27,17 +27,25 @@ The checkable form of each line is the `quality` store (`quality-simplicity`,
 - Secrets: a new secret-bearing input is `sensitive = true` + `ephemeral = true`, has no
   default, and reaches the provider through a write-only `*_wo` argument with a
   `*_wo_version` companion. Where the provider has no write-only argument, say so and
-  list the value in `SECURITY.md` (what lands in state). Known exceptions today:
-  variable and schedule-variable values (not sensitive, `for_each` iterates them) and
-  every token GitLab creates. Every output surfacing a token or a value is `sensitive`.
+  list the value in `SECURITY.md` (what lands in state). Known exceptions today (provider
+  19.5 has no write-only argument for them): CI variable and schedule variable values,
+  sent through `sensitive()` because `for_each` iterates the inputs
+  (`DEVIATION(terraform-variables)`), and every token GitLab creates. Every output carrying
+  a token is `sensitive`; no output returns a variable value.
 - `for_each` over `count`; resource label `this`; snake_case everywhere; fan-out
   keys stay `"<entry>_<target>"` (changing them replaces resources: needs `moved` blocks).
 - Send values in the form GitLab reads back: a second plan after apply must be empty.
+- Dangerous but legal settings get a `check` block in `checks.tf` whose message names the
+  entries, never a value; settings that are never acceptable get a `validation`.
 - Every behaviour change ships with a unit test in `tests/main.tftest.hcl` (a
-  rejected-input run for each new validation), an update to `examples/complete/` (and
-  any example it affects), and a commit message fit for the git-cliff changelog.
+  rejected-input run for each new validation, valid in every other respect, and a run per
+  `check`), the integration fixture in `tests/integration/` when GitLab is involved, an
+  update to `examples/complete/` (and any example it affects), and a `CHANGELOG.md` entry
+  under `## [Unreleased]` with the edit consumers must make when it is breaking.
 - Never edit the README between `BEGIN_TF_DOCS` / `END_TF_DOCS`; terraform-docs owns it.
-  Never edit `CHANGELOG.md` by hand; `mise run changelog` generates it.
+  `CHANGELOG.md` is curated by hand; git-cliff only drafts (`mise run changelog-draft`).
+- Commit subjects are capitalised imperative sentences without a type prefix (`git-commits`);
+  AI-assisted commits carry a `Co-Authored-By:` trailer (`git-identity`).
 
 ## Standards lookup
 Engineering standards are OpenSpec specs in the stores listed under `references:`
@@ -150,7 +158,8 @@ in your summary.
 
 ## Commands
 - Format / validate: `tofu fmt -recursive`, `tofu init -backend=false && tofu validate`, `tflint --recursive`
-- Tests: `tofu test` (unit, `command = plan`, no server; see TESTING.md)
-- Hooks and scanners, incl. README regeneration: `pre-commit run -a`
-- Changelog: `mise run changelog` (git-cliff)
+- Tests: `mise run test` (unit, mock provider, no server); `mise run test-integration`
+  (gitlab.com sandbox, owner + least privilege + upgrade from v12; only when asked, see TESTING.md)
+- Scanners: `mise run scan`; everything incl. README regeneration: `pre-commit run -a`
+- Changelog draft: `mise run changelog-draft`; release on `main`: `mise run release <bump> --push`
 - Specs: `mise run spec-validate`; standards stores: `mise run spec-setup`

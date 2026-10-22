@@ -14,7 +14,7 @@ Minimal module input that reproduces the issue:
 
 ```hcl
 module "gitlab_management" {
-  source = "..."
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=vX.Y.Z"
 
   # Minimal inputs that trigger the bug. REDACT real values.
 }
@@ -31,7 +31,7 @@ Steps:
 | | Version |
 |---|---|
 | Module version / tag | |
-| OpenTofu / Terraform | `tofu version` or `terraform version` |
+| OpenTofu | `tofu version` |
 | `gitlabhq/gitlab` provider | |
 | GitLab version (self-managed) or "gitlab.com" | |
 | OS | |

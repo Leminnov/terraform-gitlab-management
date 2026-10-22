@@ -1,40 +1,140 @@
-# Gitlab Terraform Module
+# GitLab CI/CD Settings Terraform Module
 
 [![Apache 2.0][apache-shield]][apache]
 [![Terraform][terraform-badge]][terraform-url]
+[![GitLab Provider][provider-badge]][provider-url]
 [![Latest Release][release-badge]][release-url]
 
-Terraform module which initialize Gitlab with:
+OpenTofu module that manages GitLab CI/CD settings across many groups and projects from one call: CI/CD variables, deploy tokens, pipeline schedules, runners and access tokens.
 
-- Group Variables
-- Project Variables
-- Deploy Tokens
-- Pipeline Schedules
-- GitLab Runners
-- Group Access Tokens
-- Project Access Tokens
+## Features
+
+- **Group and project CI/CD variables** declared once and created in every group or project of their `groups` / `projects` list, with the GitLab key rule and the variable type checked at plan time
+- **Group deploy tokens** and **group / project access tokens**, fanned out the same way, always with an expiry, with access levels and scopes accepted exactly as the provider accepts them
+- **Pipeline schedules** on a full git ref, with their variables
+- **Runners** (`gitlab_user_runner`) at group, project or instance level, with their authentication tokens as a sensitive output
+- Stable `"<entry>_<target>"` resource keys: adding or reordering targets never recreates an existing resource
+- Every CI variable and schedule variable value is **redacted in plan output**; every token output is sensitive
+- **Plan-time warnings** (`check` blocks) for secret-looking variables that are not masked and protected, tokens living longer than a year, and owner or default-level access tokens
+- No `provider {}` block: the caller configures the gitlab provider
+- Unit tests on a mock provider, and an integration fixture run against a gitlab.com sandbox as owner and as Maintainer, plus an upgrade run from v12 (empty second plan required)
+
+## Requirements
+
+| Name | Version |
+|------|---------|
+| OpenTofu | >= 1.11 |
+| gitlabhq/gitlab provider | ~> 19.5 |
+| GitLab | gitlab.com; self-managed GitLab with the API level of provider 19.5 |
+
+### Compatibility
+
+| Module | OpenTofu | Provider | GitLab | Examples applied |
+|--------|----------|----------|--------|------------------|
+| 13.0.0 (unreleased) | 1.11.14, 1.13.1 (validate and unit tests) | 19.5.0 | gitlab.com | Integration fixture not yet run against the sandbox |
+
+CI validates every example and runs the unit suite on OpenTofu 1.11.14 and 1.13.1. `instance_type` runners need an instance administrator token and are covered by the unit suite only.
 
 ## Usage
 
+### Basic Example
+
 ```hcl
+# GITLAB_TOKEN (and GITLAB_BASE_URL for a self-managed GitLab) come from the environment.
+provider "gitlab" {}
+
 module "gitlab_management" {
-  source  = "gitlab.com/leminnov/terraform/modules/gitlab-management"
-  version = "~> 1.0"
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.0.0"
 
   group_variables = {
     pipeline_log_level = {
-      key           = "PIPELINE_LOG_LEVEL"
-      groups        = ["my-org/platform"]
-      value         = "info"
-      variable_type = "env_var"
-      protected     = false
-      masked        = false
+      key    = "PIPELINE_LOG_LEVEL"
+      groups = ["my-org/platform", "my-org/data"]
+      value  = "info"
     }
   }
 }
 ```
 
-See [`examples/basic`](examples/basic) for the simplest usage, or [`examples/complete`](examples/complete) for every input exercised together.
+### Tokens and schedules
+
+```hcl
+module "gitlab_management" {
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.0.0"
+
+  deploy_tokens = {
+    registry = {
+      groups     = ["my-org/platform"]
+      name       = "read-registry"
+      expires_at = "2027-06-30T00:00:00Z" # RFC 3339, at most a year ahead
+      scopes     = ["read_registry"]
+    }
+  }
+
+  gitlab_project_access_token = {
+    release_bot = {
+      projects     = ["my-org/platform/web"]
+      name         = "release-bot"
+      expires_at   = "2027-06-30" # YYYY-MM-DD
+      access_level = "developer"
+      scopes       = ["read_api", "write_repository"]
+    }
+  }
+
+  pipeline_schedules = {
+    nightly = {
+      project     = "my-org/platform/web"
+      description = "Nightly build"
+      ref         = "refs/heads/main" # full ref
+      cron        = "0 2 * * *"
+      active      = true
+    }
+  }
+}
+
+# Store tokens straight in the system that consumes them.
+output "registry_login" {
+  value     = module.gitlab_management.deploy_tokens["registry_my-org/platform"]
+  sensitive = true
+}
+```
+
+### Complete Example
+
+[`examples/complete`](examples/complete) sets every input with settings that raise no warning: masked and protected secrets, explicit access levels, tokens expiring within a year.
+
+### Conditional Creation
+
+Every input is a map and defaults to `{}`; leave an input out, or set it to `{}`, to create nothing of that kind:
+
+```hcl
+module "gitlab_management" {
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.0.0"
+
+  gitlab_runners = var.enable_runner ? {
+    ci = {
+      runner_type  = "group_type"
+      description  = "CI runner"
+      group_id     = "12345678"
+      access_level = "ref_protected"
+      tag_list     = ["docker"]
+      paused       = false
+      untagged     = false
+      locked       = false
+    }
+  } : {}
+}
+```
+
+### Upgrading from v12
+
+Back up the state, then follow the "Changed (breaking)" and "Removed" upgrade notes in [CHANGELOG.md](CHANGELOG.md):
+
+1. Bump `?ref=` to the new tag and run `tofu init -upgrade` (provider `~> 19.5`).
+2. Give every deploy token an RFC 3339 `expires_at`. A token that had none is replaced: roll out the new one from `deploy_tokens`.
+3. Write schedule refs as `refs/heads/<branch>` or `refs/tags/<tag>`.
+4. Replace references to removed outputs as the CHANGELOG lists.
+5. Review the plan. Deploy tokens show as moves to `gitlab_group_deploy_token`, and nothing is destroyed except deploy tokens that just got an expiry. Then apply.
 
 ## Security Considerations
 
@@ -46,15 +146,15 @@ See [`examples/basic`](examples/basic) for the simplest usage, or [`examples/com
    - `access_token_privilege`: an access token has `access_level = "owner"`, or no level (GitLab then grants `maintainer`).
 4. Every deploy and access token needs an expiry; rotate tokens before it (see [SECURITY.md](SECURITY.md)).
 
-## Documentation
+## Known Limitations
 
-| File | Purpose |
-|------|---------|
-| [README.md](README.md) | This file — overview, usage, inputs/outputs |
-| [SECURITY.md](SECURITY.md) | Security considerations, secret handling, reporting vulnerabilities |
-| [TESTING.md](TESTING.md) | How to run tests locally and in CI |
-| [CHANGELOG.md](CHANGELOG.md) | Release history |
-| [openspec/](openspec/) | Specification of the module's behaviour and planned changes |
+1. CI variable values, schedule variable values and every token GitLab creates are stored in state: provider 19.5 has no write-only argument for them (see [SECURITY.md](SECURITY.md)).
+2. Tokens are immutable: changing any argument of a deploy or access token makes GitLab issue a new token, and consumers must pick it up.
+3. Only group deploy tokens are supported (`gitlab_group_deploy_token`); project deploy tokens are out of scope.
+4. The `environment_scope`, `hidden`, `raw` and `description` arguments of CI variables, the schedule `cron_timezone`, and `rotation_configuration` on access tokens are not exposed, so the provider defaults apply (all environments, visible, expanded, no description, UTC).
+5. `instance_type` runners need an instance administrator token; gitlab.com users cannot create them.
+6. GitLab limits access-token lifetime per instance; an `expires_at` beyond that limit fails at apply.
+7. Only OpenTofu is tested; HashiCorp Terraform >= 1.11 is expected to work but is not part of CI.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -113,6 +213,18 @@ No modules.
 | <a name="output_project_variables_ids"></a> [project\_variables\_ids](#output\_project\_variables\_ids) | IDs of the project CI/CD variables, in the form <project>:<key>:<environment\_scope> |
 <!-- END_TF_DOCS -->
 
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [README.md](README.md) | Module overview, usage, inputs and outputs |
+| [SECURITY.md](SECURITY.md) | What lands in state, rotation, least privilege, vulnerability reporting |
+| [TESTING.md](TESTING.md) | Unit and integration suites, how to run them locally and in CI |
+| [CHANGELOG.md](CHANGELOG.md) | Release history and upgrade notes, curated by hand |
+| [examples/](examples/) | Runnable `basic` and `complete` examples |
+| [openspec/](openspec/) | Specification of the module's behaviour and planned changes |
+| [AGENTS.md](AGENTS.md) | Rules and standards lookup for contributors and coding agents |
+
 ## Contributing
 
 1. Open an issue describing the problem or the input you need, using the templates in `.gitlab/issue_templates/`.
@@ -139,27 +251,21 @@ Pick the bump from the CHANGELOG entries, following [semantic versioning](https:
 On the tag, CI runs `verify:changelog` (the tag is on `main` and its CHANGELOG section is dated and non-empty) plus every validation, scanning and integration job; `create:release` then publishes the GitLab release with that CHANGELOG section as notes. Tags are never moved or deleted: if a tag pipeline fails, fix forward with a new patch release.
 
 ## License
-[![Apache 2.0][apache-shield]][apache]
 
-This work by LEMINNOV is licensed under the Apache License, Version 2.0.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
-You may obtain a copy of the License at:
-http://www.apache.org/licenses/LICENSE-2.0
+## Disclaimer
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This module is provided "as is", without warranty of any kind, express or implied. See the [LICENSE](LICENSE) for details.
 
-[![Apache 2.0][apache-image]][apache]
-
-[apache]: http://www.apache.org/licenses/LICENSE-2.0
-[apache-image]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+[apache]: https://opensource.org/licenses/Apache-2.0
 [apache-shield]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 
-[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.10.7-purple.svg
-[terraform-url]: https://www.terraform.io/downloads.html
+[terraform-badge]: https://img.shields.io/badge/Terraform-%3E%3D1.11-623CE4
+[terraform-url]: https://opentofu.org
 
-[release-badge]: https://img.shields.io/gitlab/v/release/leminnov/terraform/modules/gitlab?include_prereleases&sort=semver
-[release-url]: https://gitlab.com/leminnov/terraform/modules/gitlab/-/releases
+[provider-badge]: https://img.shields.io/badge/GitLab%20Provider-~%3E19.5-FC6D26
+[provider-url]: https://search.opentofu.org/provider/gitlabhq/gitlab/latest
+
+[release-badge]: https://img.shields.io/gitlab/v/release/leminnov/terraform/modules/gitlab-management?include_prereleases&sort=semver
+[release-url]: https://gitlab.com/leminnov/terraform/modules/gitlab-management/-/releases
