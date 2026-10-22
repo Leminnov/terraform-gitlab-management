@@ -1,0 +1,37 @@
+# Integration tests against the GitLab sandbox (tests/integration/run.sh):
+# owner, least-privilege and upgrade-from-v12.0.0 runs, each applying, asserting
+# server-side, requiring an empty second plan and destroying. The tokens are
+# protected, masked CI variables, so the job only runs on protected branches,
+# release tags and the weekly schedule; merge requests rely on the unit suite.
+test:integration:gitlab:
+  stage: test
+  image: alpine:3.22
+  timeout: 30m
+  needs: []
+  # The sandbox is shared: one run at a time.
+  resource_group: gitlab-sandbox
+  rules:
+    - if: $GITLAB_TOKEN == null || $GITLAB_TOKEN_LEAST == null || $SANDBOX_GROUP_ID == null || $SANDBOX_PROJECT_ID == null
+      when: never
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ || $CI_PIPELINE_SOURCE == "schedule"
+    - changes:
+        - "*.tf"
+        - tests/**/*
+        - .gitlab/integration.yml
+        - .gitlab/global.yml
+  before_script:
+    # coreutils: GNU date for the token expiry computed by run.sh.
+    - apk add --no-cache bash coreutils curl git python3 unzip
+    - |
+      set -eu
+      cd /tmp
+      curl -fsSLO "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip"
+      curl -fsSLO "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_SHA256SUMS"
+      grep " tofu_${TOFU_VERSION}_linux_amd64.zip\$" "tofu_${TOFU_VERSION}_SHA256SUMS" | sha256sum -c -
+      unzip -q -o "tofu_${TOFU_VERSION}_linux_amd64.zip" tofu -d /usr/local/bin
+      cd "$CI_PROJECT_DIR"
+    - tofu version
+  script:
+    - MODE=owner tests/integration/run.sh
+    - GITLAB_TOKEN="$GITLAB_TOKEN_LEAST" MODE=least tests/integration/run.sh
+    - MODE=upgrade tests/integration/run.sh

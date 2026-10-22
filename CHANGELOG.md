@@ -24,6 +24,8 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ### Added
 
+- Integration fixture `tests/integration/` against a sandbox group on gitlab.com, run by `mise run test-integration` and by the CI job `test:integration:gitlab` (protected refs, release tags, weekly schedule; `create:release` waits for it): an owner run, a least-privilege run and an upgrade run from `v12.0.0`. Each applies, checks the result on the server, requires an empty second plan and destroys; `TESTING.md` describes both suites.
+- `SECURITY.md` lists what lands in state and a rotation procedure per secret class.
 - Plan-time warnings (`checks.tf`): `secret_variables_masked_and_protected` (a secret-looking variable key that is not both masked and protected), `token_lifetime` (a token expiring more than a year after the plan) and `access_token_privilege` (an `owner` access token, or one with no level, which GitLab turns into `maintainer`). They warn without blocking the apply and never print a value.
 
 ### Changed

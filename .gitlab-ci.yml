@@ -3,3 +3,4 @@ include:
   - local: '.gitlab/pre-commit.yml'
   - local: '.gitlab/specs.yml'
   - local: '.gitlab/release.yml'
+  - local: '.gitlab/integration.yml'
