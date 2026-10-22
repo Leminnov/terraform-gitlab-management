@@ -1,51 +1,42 @@
-terraform {
-  required_version = ">= 1.11.0"
-
-  required_providers {
-    gitlab = {
-      source  = "gitlabhq/gitlab"
-      version = "~> 18.11"
-    }
-  }
-}
-
-provider "gitlab" {
-  # Expects GITLAB_TOKEN (or GITLAB_BASE_URL + GITLAB_TOKEN) in environment.
-}
-
 variable "demo_group" {
-  description = "Group path or ID used by this example (replace with one you can manage)."
+  description = "Full path or numeric ID of a group you own, for example my-org/platform."
   type        = string
-  default     = "my-org/platform"
+}
+
+variable "demo_group_id" {
+  description = "Numeric ID of the same group, for the group runner (GitLab shows it on the group overview page)."
+  type        = string
 }
 
 variable "demo_project" {
-  description = "Project path or ID used by this example (replace with one you can manage)."
+  description = "Full path or numeric ID of a project in that group, for example my-org/platform/web."
   type        = string
-  default     = "my-org/platform/web"
 }
 
-locals {
-  # Expires at end of next year to keep the example copy-pasteable for a while.
-  token_expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "8760h")) # ~1 year
+variable "token_expires_at" {
+  description = "Expiry date of the deploy and access tokens, YYYY-MM-DD, at most one year ahead and within the instance's maximum access-token lifetime."
+  type        = string
+}
+
+variable "registry_password" {
+  description = "Value of the REGISTRY_PASSWORD group variable. Pass via TF_VAR_registry_password from your secret store; it lands in state (see SECURITY.md)."
+  type        = string
+  sensitive   = true
 }
 
 module "gitlab_management" {
-  source = "../../"
+  source = "../.."
 
   group_variables = {
     pipeline_log_level = {
-      key           = "PIPELINE_LOG_LEVEL"
-      groups        = [var.demo_group]
-      value         = "info"
-      variable_type = "env_var"
-      protected     = false
-      masked        = false
+      key    = "PIPELINE_LOG_LEVEL"
+      groups = [var.demo_group]
+      value  = "info"
     }
     registry_password = {
       key           = "REGISTRY_PASSWORD"
       groups        = [var.demo_group]
-      value         = "change-me"
+      value         = var.registry_password
       variable_type = "env_var"
       protected     = true
       masked        = true
@@ -54,20 +45,20 @@ module "gitlab_management" {
 
   project_variables = {
     deploy_env = {
-      key           = "DEPLOY_ENV"
+      key           = "DEPLOY_CONFIG"
       projects      = [var.demo_project]
-      value         = "staging"
-      variable_type = "env_var"
-      protected     = false
-      masked        = false
+      value         = "environment: staging\n"
+      variable_type = "file"
     }
   }
 
   deploy_tokens = {
     read_registry = {
-      groups = [var.demo_group]
-      name   = "read-registry"
-      scopes = ["read_repository", "read_registry"]
+      groups     = [var.demo_group]
+      name       = "read-registry"
+      username   = "read-registry"
+      expires_at = "${var.token_expires_at}T00:00:00Z" # deploy tokens take RFC 3339
+      scopes     = ["read_repository", "read_registry"]
     }
   }
 
@@ -75,7 +66,7 @@ module "gitlab_management" {
     nightly_build = {
       project     = var.demo_project
       description = "Nightly build"
-      ref         = "main"
+      ref         = "refs/heads/main"
       cron        = "0 2 * * *"
       active      = true
       variables = {
@@ -87,9 +78,9 @@ module "gitlab_management" {
   gitlab_runners = {
     ci_runner = {
       runner_type     = "group_type"
-      description     = "CI runner for platform group"
-      group_id        = "1"
-      access_level    = "not_protected"
+      description     = "CI runner for the platform group"
+      group_id        = var.demo_group_id
+      access_level    = "ref_protected"
       tag_list        = ["docker", "linux"]
       maximum_timeout = 3600
       paused          = false
@@ -102,7 +93,7 @@ module "gitlab_management" {
     ci_bot = {
       groups       = [var.demo_group]
       name         = "ci-bot"
-      expires_at   = local.token_expires_at
+      expires_at   = var.token_expires_at
       access_level = "maintainer"
       scopes       = ["api", "read_repository", "write_repository"]
     }
@@ -112,9 +103,9 @@ module "gitlab_management" {
     release_bot = {
       projects     = [var.demo_project]
       name         = "release-bot"
-      expires_at   = local.token_expires_at
+      expires_at   = var.token_expires_at
       access_level = "developer"
-      scopes       = ["api", "read_repository", "write_repository"]
+      scopes       = ["read_api", "read_repository", "write_repository"]
     }
   }
 }

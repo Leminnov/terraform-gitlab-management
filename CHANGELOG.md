@@ -7,14 +7,47 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- Provider floor raised from `gitlabhq/gitlab ~> 18.11` to `~> 19.5`: 19.0 removes `gitlab_deploy_token`, 19.1 adds the state mover the migration below relies on, and 19.5 is the tested version. Upgrade: back up your state, bump the module `?ref=`, run `tofu init -upgrade` (provider 18.x no longer satisfies the constraint).
+- Deploy tokens are managed by `gitlab_group_deploy_token` instead of the removed `gitlab_deploy_token`. A `moved` block migrates every `gitlab_deploy_token.this["<entry>_<group>"]` to `gitlab_group_deploy_token.this["<entry>_<group>"]` through the provider's state mover: the plan shows a move, not a destroy and create, and the existing tokens keep working. Nothing to edit; review the plan before applying.
+- `deploy_tokens[*].expires_at` is required (`secrets-rotation`: no token without expiry). Upgrade: set `expires_at = "YYYY-MM-DDT00:00:00Z"`, at most a year ahead, on every deploy token. A deploy token cannot be updated, so adding an expiry makes GitLab issue a new token: apply, then read the new `username` and `token` from the `deploy_tokens` output and roll them out to the consumers (the replaced token is revoked).
+- `pipeline_schedules[*].ref` must be a full git ref, as provider 19.4+ requires. Upgrade: write `ref = "refs/heads/main"` instead of `ref = "main"`, and `refs/tags/<tag>` for a tag.
+- 13 outputs removed. They duplicated another output or echoed inputs back; they were removed rather than deprecated, by maintainer decision (`DEVIATION(repository-versioning)`). Upgrade, for each reference to a removed output:
+  - `all_tokens`: read `deploy_tokens`, `group_access_tokens` and `project_access_tokens`.
+  - `deploy_tokens_by_group`, `deploy_tokens_summary`: read `deploy_tokens` (keyed `"<entry>_<group>"`, with `group`, `name`, `username`, `expires_at` and `scopes` next to `token`).
+  - `group_access_tokens_by_group`, `group_access_tokens_summary`: read `group_access_tokens`; `project_access_tokens_by_project`, `project_access_tokens_summary`: read `project_access_tokens`.
+  - `gitlab_runners_by_type`: filter `gitlab_runners` on `runner_type`.
+  - `pipeline_schedules`: read `pipeline_schedule_ids`; the other attributes are the module input.
+  - `resource_counts`: use `length()` on the kept outputs.
+  - `group_variables`, `project_variables`, `pipeline_schedule_variables`: removed with no replacement, since they returned the values the caller already holds.
+
+### Added
+
+- Plan-time warnings (`checks.tf`): `secret_variables_masked_and_protected` (a secret-looking variable key that is not both masked and protected), `token_lifetime` (a token expiring more than a year after the plan) and `access_token_privilege` (an `owner` access token, or one with no level, which GitLab turns into `maintainer`). They warn without blocking the apply and never print a value.
+
 ### Changed
 
 - Repository tooling follows the `repository`, `terraform`, `git`, `gitlab` and `secrets` OpenSpec stores: exact tool pins in `mise.toml` (OpenTofu 1.13.1, tflint 0.64.0, terraform-docs 0.24.0, trivy 0.74.0, checkov 3.3.20, osv-scanner 2.6.0) with a `min_version`; pre-commit-terraform v1.109.1 with the validate, checkov and trivy hooks on `tofu`; pinned tflint ruleset; `.terraform-docs.yml` (`lockfile: false`, so the README shows the provider constraint), `.trivyignore.yaml` and `.gitattributes`.
 - `CHANGELOG.md` is curated by hand under `## [Unreleased]`. The `changelog` mise task, which regenerated it, is replaced by `changelog-draft`, `changelog-verify` and `release` (`scripts/release.sh`, `scripts/changelog.sh`); `test` and `scan` tasks are added.
 - Unit tests run on `mock_provider "gitlab"` and need no network or token.
+- Examples keep the provider configuration in `examples/*/providers.tf` and take every site-specific value and secret as a variable. `examples/complete` no longer computes token expiry with `timestamp()`, which changed on every plan and replaced its tokens on every apply, and no longer hard-codes the `change-me` registry password.
 - `.gitleaks.toml` uses the default rules without the blanket path allowlist: a full-history scan found nothing to exempt.
 - CI follows the `gitlab` store: `workflow: rules`, interruptible jobs with timeouts and `needs:`, `validate:opentofu` and `validate:examples` on OpenTofu 1.11.14 and 1.13.1 with `tofu test`, `security:trivy` publishing a CycloneDX SBOM to the package registry on tags, `security:gitleaks` on merge request commits and on the weekly schedule, `verify:changelog` checking the tag is on `main` with a dated CHANGELOG section, and `create:release` publishing that section as notes once every job passed.
 - Renovate opens one "toolchain" pull request for a `mise.toml` pin and its CI copies, and no longer prefixes commit subjects (`:semanticCommits` removed). The CI version variables were all mapped to the mise package before.
+
+### Fixed
+
+- The `gitlab_runners` and `gitlab_runners_by_type` outputs read `runner_id` and `status`, which `gitlab_user_runner` does not have, so any call declaring a runner failed at plan. `gitlab_runners[*].id` is the runner ID.
+- Validations now accept exactly what the provider accepts, so a wrong value fails with the module's message instead of the provider's parse error. None of these values ever worked:
+  - access-token `access_level` takes `no one` (not `no_one`) and also `planner` and `security_manager`;
+  - access-token `scopes` follow each resource's list: `read_user`, `sudo` and `admin_mode` are rejected, `read_observability` and `write_observability` accepted, and the virtual registry scopes on group tokens only;
+  - access-token `expires_at` is a `YYYY-MM-DD` date and deploy-token `expires_at` an RFC 3339 timestamp, the only forms each resource parses;
+  - `gitlab_runners[*].group_id` and `project_id` are numeric IDs, not paths.
+
+### Security
+
+- CI variable values and pipeline schedule variable values reach the provider as sensitive values, so plan and apply output show `(sensitive value)` instead of the value. They still land in state: `SECURITY.md` now lists everything that does, with its mitigation.
 
 ### Removed
 

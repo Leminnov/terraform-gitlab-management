@@ -1,26 +1,39 @@
+# DEVIATION(terraform-variables): the value input cannot be sensitive = true
+# because for_each iterates it, and the provider has no value_wo; sensitive()
+# keeps the value out of plan output. It still lands in state (SECURITY.md).
 resource "gitlab_group_variable" "this" {
   for_each = local.group_variables
 
   key           = each.value.key
   group         = each.value.group
-  value         = each.value.value
+  value         = sensitive(each.value.value)
   variable_type = each.value.variable_type
   protected     = each.value.protected
   masked        = each.value.masked
 }
 
+# DEVIATION(terraform-variables): the value input cannot be sensitive = true
+# because for_each iterates it, and the provider has no value_wo; sensitive()
+# keeps the value out of plan output. It still lands in state (SECURITY.md).
 resource "gitlab_project_variable" "this" {
   for_each = local.project_variables
 
   key           = each.value.key
   project       = each.value.project
-  value         = each.value.value
+  value         = sensitive(each.value.value)
   variable_type = each.value.variable_type
   protected     = each.value.protected
   masked        = each.value.masked
 }
 
-resource "gitlab_deploy_token" "this" {
+# gitlab_deploy_token was removed in provider 19.0; since 19.1 the provider
+# moves its state to gitlab_group_deploy_token, so existing tokens are kept.
+moved {
+  from = gitlab_deploy_token.this
+  to   = gitlab_group_deploy_token.this
+}
+
+resource "gitlab_group_deploy_token" "this" {
   for_each = local.deploy_tokens
 
   group      = each.value.group
@@ -40,15 +53,16 @@ resource "gitlab_pipeline_schedule" "this" {
   active      = each.value.active
 }
 
+# DEVIATION(terraform-variables): the value input cannot be sensitive = true
+# because for_each iterates it, and the provider has no value_wo; sensitive()
+# keeps the value out of plan output. It still lands in state (SECURITY.md).
 resource "gitlab_pipeline_schedule_variable" "this" {
   for_each = local.pipeline_schedule_variables
 
   project              = gitlab_pipeline_schedule.this[each.value.pipeline_schedule].project
   pipeline_schedule_id = gitlab_pipeline_schedule.this[each.value.pipeline_schedule].pipeline_schedule_id
   key                  = each.value.key
-  value                = each.value.value
-
-  depends_on = [gitlab_pipeline_schedule.this]
+  value                = sensitive(each.value.value)
 }
 
 resource "gitlab_user_runner" "this" {

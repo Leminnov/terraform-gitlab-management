@@ -1,10 +1,16 @@
-output "resource_counts" {
-  description = "Count of each resource type created by the module"
-  value       = module.gitlab_management.resource_counts
+output "pipeline_schedule_ids" {
+  description = "GitLab IDs of the pipeline schedules, keyed like the module input"
+  value       = module.gitlab_management.pipeline_schedule_ids
 }
 
-output "all_tokens" {
-  description = "All tokens (deploy, group access, project access) — sensitive"
-  value       = module.gitlab_management.all_tokens
+output "deploy_tokens" {
+  description = "Deploy tokens keyed \"<entry>_<group>\" (username and token to log in to the registry); read with tofu output -json"
+  value       = module.gitlab_management.deploy_tokens
+  sensitive   = true
+}
+
+output "gitlab_runner_tokens" {
+  description = "Runner authentication tokens keyed like the module input, for registering the runner manager; read with tofu output -json"
+  value       = module.gitlab_management.gitlab_runner_tokens
   sensitive   = true
 }
