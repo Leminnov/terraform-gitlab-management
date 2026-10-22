@@ -1,13 +1,42 @@
+# One pipeline per merge request, per push to main/develop, per release tag and
+# for the weekly schedule (security:gitleaks full-history scan).
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+
+default:
+  interruptible: true
+
+# mise.toml is the source of truth for every tool version. The copies below
+# are for container images and downloads outside mise and must equal the
+# mise.toml pins; the `# renovate:` comments let Renovate bump each one in the
+# same pull request as the mise pin (renovate.json, group "toolchain").
 variables:
-  # Version detection from git tags
-  GIT_DEPTH: 0  # Full history for proper tag detection
-  MISE_VERSION: "2026.4.20"
-  OSV_SCANNER_VERSION: "2.3.5"
-  GIT_CLIFF_VERSION: "2.12.0"
-  GITLEAKS_VERSION: "8.30.1"
+  GIT_DEPTH: 0
+  # DEVIATION(repository-gitlab-ci): no OSV_SCANNER_VERSION copy; the pre-commit
+  # job installs osv-scanner from mise.toml, so a CI variable would be unused.
+  # Honoured by the https://mise.run installer; same as min_version in mise.toml.
+  # renovate: datasource=github-releases depName=jdx/mise
+  MISE_VERSION: "v2026.9.14"
+  # renovate: datasource=docker depName=ghcr.io/terraform-linters/tflint
+  TFLINT_VERSION: "v0.64.0"
+  # renovate: datasource=docker depName=aquasec/trivy
+  TRIVY_VERSION: "0.74.0"
+  # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
+  GITLEAKS_VERSION: "v8.30.1"
+  # renovate: datasource=docker depName=registry.gitlab.com/gitlab-org/release-cli
+  RELEASE_CLI_VERSION: "v0.24.0"
   # Same as the "npm:@fission-ai/openspec" pin in mise.toml.
+  # renovate: datasource=npm depName=@fission-ai/openspec
   OPENSPEC_VERSION: "1.14.3"
+  # OpenTofu of the integration job (.gitlab/integration.yml), same as mise.toml.
+  # renovate: datasource=github-releases depName=opentofu/opentofu extractVersion=^v(?<version>.+)$
+  TOFU_VERSION: "1.13.1"
 
 stages:
   - validate
+  - test
   - release

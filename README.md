@@ -44,7 +44,6 @@ See [`examples/basic`](examples/basic) for the simplest usage, or [`examples/com
 | [SECURITY.md](SECURITY.md) | Security considerations, secret handling, reporting vulnerabilities |
 | [TESTING.md](TESTING.md) | How to run tests locally and in CI |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [openspec/](openspec/) | Specification of the module's behaviour and planned changes |
 
 <!-- BEGIN_TF_DOCS -->
@@ -59,7 +58,7 @@ See [`examples/basic`](examples/basic) for the simplest usage, or [`examples/com
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_gitlab"></a> [gitlab](#provider\_gitlab) | 18.11.0 |
+| <a name="provider_gitlab"></a> [gitlab](#provider\_gitlab) | ~> 18.11 |
 
 ## Modules
 
@@ -116,6 +115,31 @@ No modules.
 | <a name="output_project_variables_ids"></a> [project\_variables\_ids](#output\_project\_variables\_ids) | List of all project variable IDs |
 | <a name="output_resource_counts"></a> [resource\_counts](#output\_resource\_counts) | Count of all created resources by type |
 <!-- END_TF_DOCS -->
+
+## Contributing
+
+1. Open an issue describing the problem or the input you need, using the templates in `.gitlab/issue_templates/`.
+2. For a behaviour change, plan it as an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change before writing HCL: `/openspec-propose` in Claude Code or OpenCode creates `openspec/changes/<name>/` with a proposal, delta specs, a design and tasks; `openspec/specs/` holds the current specification. Implement with `/openspec-apply-change`, then `/openspec-archive-change` merges the deltas into the main specs. The engineering standards are OpenSpec stores referenced from `openspec/config.yaml` with a pinned tag; run `mise run spec-setup` once per machine to register them ([AGENTS.md](AGENTS.md) explains when to read them).
+3. Create a `feature/<topic>`, `fix/<topic>`, `chore/<topic>` or `docs/<topic>` branch from `develop`, run `mise install` and `pre-commit install` once, then `pre-commit run -a`, `mise run test` and `mise run spec-validate`.
+4. Write commit subjects as a capitalised imperative sentence of at most 72 characters without a type prefix (`Add project deploy tokens`, not `feat: add ...`), explain why in the body and reference the issue (`Closes #12`). Declare a pairing partner or an AI coding agent with a `Co-Authored-By:` trailer.
+5. Add an entry under `## [Unreleased]` in `CHANGELOG.md`, with the edit consumers must make for anything breaking, then open a merge request into `develop` with the template filled. It stays Draft until the pipeline is green.
+
+## Releasing
+
+A release is an annotated, signed `vX.Y.Z` tag on `main` with a dated `CHANGELOG.md` section. `mise run release` produces one; a tag made by hand that meets both checks is accepted too.
+
+```sh
+# On main: runs pre-commit, the unit tests and openspec validate, dates the
+# [Unreleased] CHANGELOG section, points the README examples at the new tag,
+# commits "Release vX.Y.Z", creates the signed tag and, with --push, pushes
+# main and the tag together, then merges main back into develop.
+git checkout main && git pull
+mise run release major --push     # or: minor | patch | 13.0.0
+```
+
+Pick the bump from the CHANGELOG entries, following [semantic versioning](https://semver.org): **major** for anything under *Changed (breaking)* or *Removed*, or a raised OpenTofu or provider floor; **minor** for new inputs, outputs or resources; **patch** for fixes and docs.
+
+On the tag, CI runs `verify:changelog` (the tag is on `main` and its CHANGELOG section is dated and non-empty) plus every validation, scanning and integration job; `create:release` then publishes the GitLab release with that CHANGELOG section as notes. Tags are never moved or deleted: if a tag pipeline fails, fix forward with a new patch release.
 
 ## License
 [![Apache 2.0][apache-shield]][apache]

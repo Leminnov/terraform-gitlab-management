@@ -1,14 +1,10 @@
 # Plan-level tests for the gitlab-management module.
 #
 # These tests exercise the module's expansion and validation logic without
-# contacting GitLab. Every `run` uses `command = plan`, so no real API calls
-# are made.
+# contacting GitLab: the provider is mocked and every `run` uses
+# `command = plan`.
 
-provider "gitlab" {
-  token            = "dummy-test-token"
-  base_url         = "https://gitlab.example.com/"
-  early_auth_check = false
-}
+mock_provider "gitlab" {}
 
 # ---------------------------------------------------------------------------
 # Expansion logic
