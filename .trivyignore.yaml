@@ -1,0 +1,3 @@
+# Trivy exceptions. Keep them path-scoped and justified; pass with
+# `trivy config --ignorefile .trivyignore.yaml` (CI, pre-commit and `mise run scan` do).
+misconfigurations: []

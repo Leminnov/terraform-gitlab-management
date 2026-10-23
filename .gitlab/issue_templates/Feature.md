@@ -8,7 +8,7 @@
 
 ```hcl
 module "gitlab_management" {
-  source = "..."
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=vX.Y.Z"
 
   # How you'd want to call it.
 }
@@ -22,7 +22,7 @@ module "gitlab_management" {
 
 - [ ] gitlab_group_variable
 - [ ] gitlab_project_variable
-- [ ] gitlab_deploy_token
+- [ ] gitlab_group_deploy_token
 - [ ] gitlab_pipeline_schedule
 - [ ] gitlab_user_runner
 - [ ] gitlab_group_access_token

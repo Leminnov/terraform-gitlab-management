@@ -1,6 +1,93 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+The format follows [Keep a Changelog](https://keepachangelog.com) and the
+project follows [Semantic Versioning](https://semver.org). Sections before
+11.1.0 were generated from commit messages by git-cliff.
+
+## [Unreleased]
+
+### Changed (breaking)
+
+- Keys of `group_variables`, `project_variables`, `deploy_tokens`, `pipeline_schedules`, `gitlab_runners`, `gitlab_group_access_token` and `gitlab_project_access_token` can no longer contain `:`, which the objects nested in `groups` and `projects` use in their keys. Upgrade: rename such an entry and move each of its resources, or they are replaced; for an entry `ci:lint` of `group_variables` on group `org/a` renamed `ci_lint`: `moved { from = module.<name>.gitlab_group_variable.this["ci:lint_org/a"] to = module.<name>.gitlab_group_variable.this["ci_lint_org/a"] }`.
+- Provider floor raised from `gitlabhq/gitlab ~> 18.11` to `~> 19.5`: 19.0 removes `gitlab_deploy_token`, 19.1 adds the state mover the migration below relies on, and 19.5 is the tested version. Upgrade: back up your state, bump the module `?ref=`, run `tofu init -upgrade` (provider 18.x no longer satisfies the constraint).
+- Deploy tokens are managed by `gitlab_group_deploy_token` instead of the removed `gitlab_deploy_token`. A `moved` block migrates every `gitlab_deploy_token.this["<entry>_<group>"]` to `gitlab_group_deploy_token.this["<entry>_<group>"]` through the provider's state mover: the plan shows a move, not a destroy and create, and the existing tokens keep working. Nothing to edit; review the plan before applying.
+- `deploy_tokens[*].expires_at` is required (`secrets-rotation`: no token without expiry). Upgrade: set `expires_at = "YYYY-MM-DDT00:00:00Z"`, at most a year ahead, on every deploy token. A deploy token cannot be updated, so adding an expiry makes GitLab issue a new token: apply, then read the new `username` and `token` from the `deploy_tokens` output and roll them out to the consumers (the replaced token is revoked).
+- `pipeline_schedules[*].ref` must be a full git ref, as provider 19.4+ requires. Upgrade: write `ref = "refs/heads/main"` instead of `ref = "main"`, and `refs/tags/<tag>` for a tag.
+- 13 outputs removed. They duplicated another output or echoed inputs back; they were removed rather than deprecated, by maintainer decision (`DEVIATION(repository-versioning)`). Upgrade, for each reference to a removed output:
+  - `all_tokens`: read `deploy_tokens`, `group_access_tokens` and `project_access_tokens`.
+  - `deploy_tokens_by_group`, `deploy_tokens_summary`: read `deploy_tokens` (keyed `"<entry>_<group>"`, with `group`, `name`, `username`, `expires_at` and `scopes` next to `token`).
+  - `group_access_tokens_by_group`, `group_access_tokens_summary`: read `group_access_tokens`; `project_access_tokens_by_project`, `project_access_tokens_summary`: read `project_access_tokens`.
+  - `gitlab_runners_by_type`: filter `gitlab_runners` on `runner_type`.
+  - `pipeline_schedules`: read `pipeline_schedule_ids`; the other attributes are the module input.
+  - `resource_counts`: use `length()` on the kept outputs.
+  - `group_variables`, `project_variables`, `pipeline_schedule_variables`: removed with no replacement, since they returned the values the caller already holds.
+
+### Added
+
+- Group and project tree: `parent_group_id` names the existing group the tree is created under (gitlab.com does not let the provider create top-level groups), `groups` creates up to 7 levels keyed by path (`platform`, `platform/infra`, ...) and `projects` creates projects keyed the same way (`platform/infra/api`). Defaults follow the `gitlab-project-settings` and `git-branching` standards: private, access requests off, project creation by maintainers and subgroup creation by owners, `main` initialised with a README plus a `develop` branch, `main` protected for maintainers and `develop` for developers without force push, `v*` tags protected for maintainers, merges only on a green pipeline with every thread resolved, squash encouraged, merge commits and source branches deleted. Groups and projects are archived instead of deleted on destroy unless `archive_on_destroy = false`. New outputs `groups` and `projects`.
+- Objects nested in each `groups` and `projects` entry, keyed `"<group or project key>:<item key>"`: `variables`, `deploy_tokens`, `access_tokens`, `members`, `shared_with` (a created group by key or an existing one by ID) and `runners` on both, plus `deploy_keys` (read-only by default, expiry required), `pipeline_schedules` (on the default branch by default), `pipeline_triggers`, `environments` and `job_token_allowlist` on projects. They share resources and outputs with the standalone inputs, under the same validations. New sensitive outputs `project_deploy_tokens` and `pipeline_trigger_tokens`.
+- `labels` and `badges` on each `groups` and `projects` entry, and `hooks` on projects: webhooks send push events and verify TLS by default, and their `token` and `signing_token` are redacted in plans (stored in state, `SECURITY.md`); `signing_token` must be `whsec_` followed by the base64 of a 32-byte key, the only form GitLab accepts.
+- Premium settings, off by default so a Free namespace plans none of them: `approval_rules`, `merge_request_approvals` (approvals reset on push, no self-approval, approvers fixed), `push_rules` (secrets, tag deletion and non-member commits rejected), `protected_environments` (maintainers deploy) and `protected_branches[*].code_owner_approval_required` on projects, and `hooks` on groups.
+- Plan-time warnings `public_visibility`, `protected_branch_force_push`, `webhook_ssl_verification` and `deploy_key_write_access`; `token_lifetime` also reads project deploy tokens and deploy keys, and every existing warning covers the objects nested in groups and projects.
+- Integration fixture `tests/integration/` against a sandbox group on gitlab.com, run by `mise run test-integration` and by the CI job `test:integration:gitlab` (protected refs, release tags, weekly schedule; `create:release` waits for it): an owner run, a least-privilege run and an upgrade run from `v12.0.0`. Each applies, checks the result on the server, requires an empty second plan and destroys; `TESTING.md` describes both suites.
+- `SECURITY.md` lists what lands in state and a rotation procedure per secret class.
+- Plan-time warnings (`checks.tf`): `secret_variables_masked_and_protected` (a secret-looking variable key that is not both masked and protected), `token_lifetime` (a token expiring more than a year after the plan) and `access_token_privilege` (an `owner` access token, or one with no level, which GitLab turns into `maintainer`). They warn without blocking the apply and never print a value.
+
+### Changed
+
+- Toolchain on the latest stable releases: OpenTofu 1.13.2 (CI also validates on 1.11.14), pre-commit 4.7.0, trivy 0.76.1, checkov 3.3.30, osv-scanner 2.7.0, mise 2026.10.17, Python 3.14.9, node 24.22.1 (LTS) and pre-commit-terraform v1.109.3, one patch above the terraform store's pin (`DEVIATION(terraform-repo-precommit)`); CI on `alpine:3.24` and `ubuntu:26.04`, one LTS above the `repository` store's `ubuntu:24.04` for the pre-commit job (`DEVIATION(repository-gitlab-ci)`).
+- Resources live in themed files (`groups.tf`, `projects.tf`, `access.tf`, `ci.tf`, `metadata.tf`, `premium.tf`) listed in `main.tf`; addresses are unchanged.
+- Repository tooling follows the `repository`, `terraform`, `git`, `gitlab` and `secrets` OpenSpec stores: exact tool pins in `mise.toml` (OpenTofu 1.13.2, tflint 0.64.0, terraform-docs 0.24.0, trivy 0.76.1, checkov 3.3.30, osv-scanner 2.7.0) with a `min_version`; pre-commit-terraform v1.109.1 with the validate, checkov and trivy hooks on `tofu`; pinned tflint ruleset; `.terraform-docs.yml` (`lockfile: false`, so the README shows the provider constraint), `.trivyignore.yaml` and `.gitattributes`.
+- `CHANGELOG.md` is curated by hand under `## [Unreleased]`. The `changelog` mise task, which regenerated it, is replaced by `changelog-draft`, `changelog-verify` and `release` (`scripts/release.sh`, `scripts/changelog.sh`); `test` and `scan` tasks are added.
+- Unit tests run on `mock_provider "gitlab"` and need no network or token.
+- Examples keep the provider configuration in `examples/*/providers.tf` and take every site-specific value and secret as a variable. `examples/complete` no longer computes token expiry with `timestamp()`, which changed on every plan and replaced its tokens on every apply, and no longer hard-codes the `change-me` registry password.
+- `.gitleaks.toml` uses the default rules without the blanket path allowlist: a full-history scan found nothing to exempt.
+- CI follows the `gitlab` store: `workflow: rules`, interruptible jobs with timeouts and `needs:`, `validate:opentofu` and `validate:examples` on OpenTofu 1.11.14 and 1.13.2 with `tofu test`, `security:trivy` publishing a CycloneDX SBOM to the package registry on tags, `security:gitleaks` on merge request commits and on the weekly schedule, `verify:changelog` checking the tag is on `main` with a dated CHANGELOG section, and `create:release` publishing that section as notes once every job passed.
+- Renovate opens one "toolchain" pull request for a `mise.toml` pin and its CI copies, and no longer prefixes commit subjects (`:semanticCommits` removed). The CI version variables were all mapped to the mise package before.
+
+### Fixed
+
+- The `gitlab_runners` and `gitlab_runners_by_type` outputs read `runner_id` and `status`, which `gitlab_user_runner` does not have, so any call declaring a runner failed at plan. `gitlab_runners[*].id` is the runner ID.
+- Validations now accept exactly what the provider accepts, so a wrong value fails with the module's message instead of the provider's parse error. None of these values ever worked:
+  - access-token `access_level` takes `no one` (not `no_one`) and also `planner` and `security_manager`;
+  - access-token `scopes` follow each resource's list: `read_user`, `sudo` and `admin_mode` are rejected, `read_observability` and `write_observability` accepted, and the virtual registry scopes on group tokens only;
+  - access-token `expires_at` is a `YYYY-MM-DD` date and deploy-token `expires_at` an RFC 3339 timestamp, the only forms each resource parses;
+  - `gitlab_runners[*].group_id` and `project_id` are numeric IDs, not paths.
+
+### Security
+
+- CI variable values and pipeline schedule variable values reach the provider as sensitive values, so plan and apply output show `(sensitive value)` instead of the value. They still land in state: `SECURITY.md` now lists everything that does, with its mitigation.
+- Nested CI variable and schedule variable values and webhook `token` / `signing_token` are redacted in plans the same way. They, and the tokens GitLab creates for the new resources (project deploy tokens, pipeline trigger tokens) and for nested group deploy, access and runner tokens, land in state; `SECURITY.md` lists each one with its rotation.
+
+### Removed
+
+- The general pre-commit hooks outside the canonical set (`no-commit-to-branch`, `detect-aws-credentials`, `check-added-large-files`, `check-case-conflict`, `check-executables-have-shebangs`, `check-toml`); gitleaks covers AWS credentials.
+- The GitHub Actions workflows (`.github/`): the project is built on GitLab CI only.
+- The `SHA256SUMS.txt` release asset: it was a job artifact that expired after a year. The signed tag and the SBOM replace it.
+- `RELEASE.md` and `CONTRIBUTING.md`: the README Releasing and Contributing sections replace them (the old guides described pre-release and moved tags and conventional-commit prefixes, which the `git-history` and `git-commits` standards rule out).
+
+## [12.0.0] - 2026-04-25
+
+### Changed (breaking)
+
+- `required_version` raised from `>= 1.10.7` to `>= 1.11.0`, and the provider from `gitlabhq/gitlab ~> 18.6` to `~> 18.11`. Upgrade: use OpenTofu 1.11 or later and run `tofu init -upgrade`.
+- Every input is typed (`map(object({...}))` instead of `any`), so unknown attributes are rejected at plan time. Upgrade: remove attributes the module never read; the variable descriptions list the accepted fields and their defaults.
+
+### Added
+
+- Validation blocks on every input (variable keys and types, deploy and access token scopes, access levels, expiry formats, runner settings, cron) and a plan-level unit suite in `tests/main.tftest.hcl`.
+- `examples/basic` and `examples/complete`, `SECURITY.md`, `TESTING.md`, `CODEOWNERS`, issue and merge request templates, Renovate, and gitleaks and trivy scanning in CI.
+
+## [11.1.0] - 2025-12-25
+
+### Added
+
+- GitLab CI and GitHub Actions pipelines: pre-commit, vulnerability scanning, OpenTofu and TFLint validation, changelog verification and release creation on tags.
+
+### Changed
+
+- The changelog is generated by CI instead of a pre-commit hook.
 
 ## [11.0.0] - 2025-12-13
 - Adds explicit key assignment to variables

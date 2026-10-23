@@ -10,16 +10,6 @@ insert_final_newline = true
 charset = utf-8
 trim_trailing_whitespace = true
 
-# Terraform files
-[*.tf]
-indent_style = space
-indent_size = 2
-
-# HCL files
-[*.hcl]
-indent_style = space
-indent_size = 2
-
 # YAML files
 [*.{yml,yaml}]
 indent_style = space
@@ -34,3 +24,13 @@ indent_size = 2
 # Makefile
 [Makefile]
 indent_style = tab
+
+# Terraform files
+[*.tf]
+indent_style = space
+indent_size = 2
+
+# HCL files
+[*.hcl]
+indent_style = space
+indent_size = 2

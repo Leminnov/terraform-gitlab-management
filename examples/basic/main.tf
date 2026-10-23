@@ -1,29 +1,16 @@
-terraform {
-  required_version = ">= 1.11.0"
-
-  required_providers {
-    gitlab = {
-      source  = "gitlabhq/gitlab"
-      version = "~> 18.11"
-    }
-  }
-}
-
-provider "gitlab" {
-  # Expects GITLAB_TOKEN (or GITLAB_BASE_URL + GITLAB_TOKEN) in environment.
+variable "group" {
+  description = "Full path or numeric ID of a group you can manage (Maintainer role or higher), for example my-org/platform."
+  type        = string
 }
 
 module "gitlab_management" {
-  source = "../../"
+  source = "../.."
 
   group_variables = {
     pipeline_log_level = {
-      key           = "PIPELINE_LOG_LEVEL"
-      groups        = ["my-org/platform"]
-      value         = "info"
-      variable_type = "env_var"
-      protected     = false
-      masked        = false
+      key    = "PIPELINE_LOG_LEVEL"
+      groups = [var.group]
+      value  = "info"
     }
   }
 }

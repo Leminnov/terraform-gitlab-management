@@ -1,42 +1,41 @@
 pre-commit:
   stage: validate
-  image: ubuntu:24.04
+  # DEVIATION(repository-gitlab-ci): ubuntu:26.04, the current LTS, instead of the
+  # store's ubuntu:24.04 (maintainer decision: latest stable toolchain).
+  image: ubuntu:26.04
+  timeout: 20m
+  needs: []
   rules:
-    - exists:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
+      exists:
         - .pre-commit-config.yaml
-      when: always
   variables:
     PRE_COMMIT_HOME: $CI_PROJECT_DIR/.cache/pre-commit
     MISE_DATA_DIR: $CI_PROJECT_DIR/.cache/mise
-    MISE_CACHE_DIR: $CI_PROJECT_DIR/.cache/mise/cache
   cache:
-    key: pre-commit-${CI_COMMIT_REF_SLUG}
+    key: "pre-commit-$CI_COMMIT_REF_SLUG"
     paths:
-      - $CI_PROJECT_DIR/.cache
+      - $CI_PROJECT_DIR/.cache/pre-commit
+      - $CI_PROJECT_DIR/.cache/mise
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3
-    # Install mise
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends git curl ca-certificates python3
     - curl -fsSL https://mise.run | sh
     - export PATH="$HOME/.local/bin:$PATH"
-    # Install all tools from mise.toml
+    - mise trust --yes
+    # Installs every tool pinned in mise.toml, including the scanners.
     - mise install
-    # Activate mise for current shell
     - eval "$(mise activate bash)"
-    # Install osv-scanner (not in mise)
-    - |
-      curl -fsSL https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64 \
-        -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner
-    # Create initial tag if none exist (required by git-cliff)
-    - |
-      if ! git describe --tags 2>/dev/null; then
-        git tag v0.0.0 $(git rev-list --max-parents=0 HEAD) 2>/dev/null || true
-      fi
+    # git-cliff requires at least one tag to exist
+    - git tag | grep -q . || git tag v0.0.0
   script:
-    - eval "$(mise activate bash)"
     - |
-      if [ "${SKIP_OSV_SCAN:-false}" = "true" ]; then
-        echo "Skipping OSV Scanner"
+      if [ "${SKIP_OSV_SCAN:-false}" != "true" ]; then
+        # Exit code 128 means "no package sources found": this repository has
+        # no lock files osv-scanner understands (Terraform locks are ignored).
+        rc=0; osv-scanner scan source -r . || rc=$?
+        if [ "$rc" -ne 0 ] && [ "$rc" -ne 128 ]; then exit "$rc"; fi
       else
-        osv-scanner -r .
+        echo "Skipping OSV Scanner: SKIP_OSV_SCAN=$SKIP_OSV_SCAN"
       fi
-    - pre-commit run -a -v --show-diff-on-failure --color always
+    - pre-commit run -a -v

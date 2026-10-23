@@ -6,6 +6,7 @@
 *.tfvars
 !example.tfvars
 .terraform.lock.hcl
+crash.log
 
 # Copies of main_providers.tf
 main_providers.tf
@@ -16,10 +17,13 @@ main_providers.tf
 # Secrets are not allowed in general
 *.key
 *.pem
+age.key
+*.dec.*
+*.plain.*
 secrets.auto.tfvars
 
-# Secrets are encrypted using git-crypt
-!secrets/*
+# Encrypted secrets are committed
+!secrets/**-enc.*
 
 # OS X
 .history
@@ -49,3 +53,4 @@ out/
 .envrc
 
 mise.local.toml
+.claude/settings.local.json

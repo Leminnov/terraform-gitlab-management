@@ -1,38 +1,57 @@
 # Complete Example
 
-Exercises every input of the `gitlab-management` module.
+Exercises every input of the module with settings that raise no guardrail warning: secret-looking variables masked and protected, explicit token access levels, and tokens that expire within a year.
 
 ## What this example does
 
-- Creates 2 group variables (one masked+protected)
-- Creates 1 project variable
-- Creates 1 group deploy token (`read_repository`, `read_registry`)
-- Creates 1 pipeline schedule with 1 pipeline-schedule variable
-- Registers 1 group-level GitLab runner
-- Creates 1 group access token (`maintainer`)
-- Creates 1 project access token (`developer`)
+- Creates the groups `platform` and `platform/backend` under the demo group, and the projects `platform/docs` and `platform/backend/api`, with the module defaults: private, `main` initialised and protected for maintainers, `develop` created and protected for developers, `v*` tags protected, merges only on a green pipeline with threads resolved.
+- Gives `platform` a `bug` label and a pipeline badge that every project in it shows.
+- Nests in `platform/backend/api` a `LOG_LEVEL` variable, a read-only project deploy token, a read-only deploy key, a `production` environment and a reporter membership that expires with the tokens.
+- Creates 2 group variables (`PIPELINE_LOG_LEVEL`, and `REGISTRY_PASSWORD` masked and protected) and 1 file-type project variable.
+- Creates 1 group deploy token (`read_repository`, `read_registry`).
+- Creates 1 pipeline schedule on `refs/heads/main` with 1 schedule variable.
+- Registers 1 group runner limited to protected refs.
+- Creates 1 group access token (`maintainer`) and 1 project access token (`developer`).
 
 ## Prerequisites
 
-- A GitLab token with `api` scope exported as `GITLAB_TOKEN`.
-- For self-managed GitLab, also export `GITLAB_BASE_URL`.
-- Override `demo_group` and `demo_project` with identifiers you can manage.
+- OpenTofu >= 1.11.
+- A group you own (subgroups, group runners and group access tokens need the Owner role) and a project in it, on gitlab.com or a self-managed GitLab.
+- A token with the `api` scope (and `create_runner` for the runner) for that group, kept in your secret store.
+- The public key of the machine that clones `platform/backend/api`, and the numeric ID of a user to add as reporter.
+- The value of `REGISTRY_PASSWORD` in your secret store; it lands in state, like every token this example creates ([SECURITY.md](../../SECURITY.md)).
 
 ## Usage
 
+Pass the token and the secret for the command only, from your secret store, never through `export` or a file; set `GITLAB_BASE_URL` for a self-managed GitLab:
+
 ```sh
-terraform init
-terraform plan -var="demo_group=my-org/platform" -var="demo_project=my-org/platform/web"
-terraform apply -var="demo_group=my-org/platform" -var="demo_project=my-org/platform/web"
+cat > example.tfvars <<'VARS'
+demo_group       = "my-org/platform"
+demo_group_id    = "12345678"
+demo_project     = "my-org/platform/web"
+token_expires_at = "2027-06-30"
+deploy_key       = "ssh-ed25519 AAAA... gitops@example"
+reviewer_user_id = 1234567
+VARS
+
+tofu init
+GITLAB_TOKEN="$(bao kv get -field=token kv/gitlab/terraform)" \
+TF_VAR_registry_password="$(bao kv get -field=password kv/registry/ci)" \
+  tofu apply -var-file=example.tfvars
 ```
 
 ## Outputs
 
-- `resource_counts` — how many of each resource type were created.
-- `all_tokens` — consolidated sensitive token output (requires `-json` to read).
+- `pipeline_schedule_ids`: schedule IDs keyed like the input.
+- `deploy_tokens`, `project_deploy_tokens`, `gitlab_runner_tokens`: sensitive; read them with `tofu output -json <name>` and store them straight in the system that consumes them.
 
 ## Cleanup
 
+The created groups and projects are archived, not deleted, on destroy (the module's safe default), so their paths stay taken; delete them in the GitLab UI afterwards, or set `archive_on_destroy = false` on each entry before destroying a throwaway tree.
+
 ```sh
-terraform destroy -var="demo_group=..." -var="demo_project=..."
+GITLAB_TOKEN="$(bao kv get -field=token kv/gitlab/terraform)" \
+TF_VAR_registry_password="$(bao kv get -field=password kv/registry/ci)" \
+  tofu destroy -var-file=example.tfvars
 ```

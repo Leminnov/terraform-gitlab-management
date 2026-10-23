@@ -1,153 +1,157 @@
-# =============================================================================
-# VALIDATION STAGE - Run on all commits
-# =============================================================================
-
 validate:opentofu:
   stage: validate
+  timeout: 10m
+  # The image's entrypoint is `tofu`; clear it so GitLab can run the script with sh.
   image:
-    name: ghcr.io/opentofu/opentofu:1.11.6
+    name: ghcr.io/opentofu/opentofu:${TOFU_IMAGE_VERSION}
     entrypoint: [""]
-  rules:
-    - when: always
+  # Minimum supported version and the mise.toml pin, exact tags (terraform-repo-mise).
+  parallel:
+    matrix:
+      - TOFU_IMAGE_VERSION: ["1.11.14", "1.13.2"]
+  needs: []
   script:
     - tofu init -backend=false
     - tofu validate
     - tofu fmt -check -recursive
-  cache:
-    paths:
-      - .terraform
+    # Unit suite: mock provider, no server and no token (terraform-testing).
+    - tofu test
+
+validate:examples:
+  stage: validate
+  timeout: 10m
+  image:
+    name: ghcr.io/opentofu/opentofu:${TOFU_IMAGE_VERSION}
+    entrypoint: [""]
+  # Same matrix as validate:opentofu.
+  parallel:
+    matrix:
+      - TOFU_IMAGE_VERSION: ["1.11.14", "1.13.2"]
+  needs: []
+  script:
+    - |
+      set -eu
+      for d in examples/*/; do
+        echo "::: validating $d"
+        (cd "$d" && tofu init -backend=false && tofu validate)
+      done
 
 validate:tflint:
   stage: validate
+  timeout: 10m
+  # The image's entrypoint is `tflint`; clear it so GitLab can run the script with sh.
   image:
-    name: ghcr.io/terraform-linters/tflint:v0.62.0
+    name: ghcr.io/terraform-linters/tflint:${TFLINT_VERSION}
     entrypoint: [""]
-  rules:
-    - when: always
-  script:
+  needs: []
+  before_script:
     - tflint --init
+  script:
     - tflint --recursive
 
-validate:tftest:
+security:trivy:
   stage: validate
+  timeout: 10m
   image:
-    name: ghcr.io/opentofu/opentofu:1.11.6
+    name: aquasec/trivy:${TRIVY_VERSION}
     entrypoint: [""]
-  rules:
-    - when: always
+  needs: []
+  variables:
+    TRIVY_EXIT_CODE: "1"
+    TRIVY_SEVERITY: "MEDIUM,HIGH,CRITICAL"
+    TRIVY_IGNORE_UNFIXED: "true"
   script:
-    - tofu init -backend=false
-    - tofu test
+    # Misconfigurations in the Terraform code
+    - trivy config --exit-code $TRIVY_EXIT_CODE --severity $TRIVY_SEVERITY --ignorefile .trivyignore.yaml --skip-dirs "**/.terraform" .
+    # Secrets and vulnerable dependencies anywhere in the repository
+    - trivy fs --exit-code $TRIVY_EXIT_CODE --severity $TRIVY_SEVERITY --scanners vuln,secret --skip-dirs "**/.terraform" .
+    # CycloneDX SBOM; on a release tag it is published to the generic package
+    # registry so the release asset link never expires (gitlab-releases).
+    - trivy fs --format cyclonedx --output sbom.cdx.json --skip-dirs "**/.terraform,examples" .
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        apk add --no-cache curl >/dev/null
+        curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file sbom.cdx.json \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/sbom/$CI_COMMIT_TAG/sbom.cdx.json"
+      fi
+  # Release SBOMs live in the package registry; branch and merge-request SBOMs
+  # are only kept for review.
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - sbom.cdx.json
 
-scan:trivy:
+# Secret scan with gitleaks (secrets-detection): the commits of a merge request,
+# and the full history on the weekly pipeline schedule. The pre-commit hook
+# only sees staged files, and trivy fs covers the tree of every other pipeline.
+security:gitleaks:
   stage: validate
+  timeout: 10m
   image:
-    name: aquasec/trivy:0.70.0
+    name: ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}
     entrypoint: [""]
+  needs: []
   rules:
-    - when: always
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
-    - trivy config --exit-code 1 --severity HIGH,CRITICAL .
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - |
+      set -eu
+      if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+        gitleaks git --redact --no-banner --exit-code 1 --log-opts="$CI_MERGE_REQUEST_DIFF_BASE_SHA..$CI_COMMIT_SHA" .
+      else
+        gitleaks git --redact --no-banner --exit-code 1 .
+      fi
 
-scan:gitleaks:
-  stage: validate
-  image:
-    name: ghcr.io/gitleaks/gitleaks:v${GITLEAKS_VERSION}
-    entrypoint: [""]
-  rules:
-    - when: always
-  script:
-    - gitleaks detect --source . --no-git --config .gitleaks.toml --redact --verbose
-
-
-# =============================================================================
-# CHANGELOG VERIFICATION - Ensure CHANGELOG is up to date on tags
-# =============================================================================
-
+# Any annotated vX.Y.Z tag is releasable when it is on main and CHANGELOG.md
+# has a dated non-empty section for it; `mise run release` is the usual way to
+# produce one (it also points the README examples at the tag), a hand-made tag
+# that meets both checks is accepted too.
 verify:changelog:
   stage: validate
-  image: alpine:3.22
+  image: alpine:3.24
+  timeout: 5m
+  needs: []
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   before_script:
-    - apk add --no-cache git curl bash
-    - |
-      curl -sSfL https://github.com/orhun/git-cliff/releases/download/v${GIT_CLIFF_VERSION}/git-cliff-${GIT_CLIFF_VERSION}-x86_64-unknown-linux-musl.tar.gz \
-        | tar -xz -C /usr/local/bin --strip-components=1 git-cliff-${GIT_CLIFF_VERSION}/git-cliff
-    - chmod +x /usr/local/bin/git-cliff
+    - apk add --no-cache bash git
   script:
-    - echo "Verifying CHANGELOG.md is up to date..."
-    - git-cliff --config .cliff.toml --output CHANGELOG.generated.md
-    - |
-      if ! diff -q CHANGELOG.md CHANGELOG.generated.md > /dev/null 2>&1; then
-        echo "⚠️  WARNING: CHANGELOG.md may be outdated"
-        echo "Run 'git-cliff --output CHANGELOG.md' to update it"
-        diff CHANGELOG.md CHANGELOG.generated.md || true
-      else
-        echo "✅ CHANGELOG.md is up to date"
-      fi
-  allow_failure: false
-
-
-# =============================================================================
-# RELEASE STAGE - Only on semantic version tags
-# =============================================================================
+    - scripts/release.sh check "$CI_COMMIT_TAG"
 
 create:release:
   stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:v0.24.0
-  rules:
-    # Only run on semantic version tags (e.g., v1.2.3, v2.0.0-beta.1)
-    - if: $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$/
+  image: registry.gitlab.com/gitlab-org/release-cli:${RELEASE_CLI_VERSION}
+  timeout: 5m
+  interruptible: false
+  # Every validation, test and scan job of a tag pipeline (gitlab-releases).
   needs:
     - pre-commit
+    - validate:specs
     - validate:opentofu
+    - validate:examples
     - validate:tflint
-    - validate:tftest
-    - scan:trivy
-    - scan:gitleaks
+    - security:trivy
     - verify:changelog
-  before_script:
-    - apk add --no-cache git curl bash coreutils
-    # Install git-cliff
-    - |
-      curl -sSfL https://github.com/orhun/git-cliff/releases/download/v${GIT_CLIFF_VERSION}/git-cliff-${GIT_CLIFF_VERSION}-x86_64-unknown-linux-musl.tar.gz \
-        | tar -xz -C /usr/local/bin --strip-components=1 git-cliff-${GIT_CLIFF_VERSION}/git-cliff
-    - chmod +x /usr/local/bin/git-cliff
+    - test:integration:gitlab
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   script:
-    - export VERSION=${CI_COMMIT_TAG#v}
-    - echo "Creating release for version $VERSION"
-    # Generate release notes for this tag only
-    - git-cliff --config .cliff.toml --latest --strip header > release_notes.md
-    - cat release_notes.md
-    # Checksums over the source tree excluding VCS and build artifacts
-    - |
-      find . -type f \
-        \( -name "*.tf" -o -name "*.hcl" -o -name "*.toml" -o -name "*.yml" -o -name "*.yaml" -o -name "*.md" \) \
-        ! -path "./.git/*" ! -path "./.terraform/*" ! -path "./.cache/*" \
-        | sort | xargs sha256sum > SHA256SUMS.txt
-    - cat SHA256SUMS.txt | head -20
-  artifacts:
-    paths:
-      - release_notes.md
-      - SHA256SUMS.txt
-    expire_in: 1 year
+    # Release notes are the tag's curated CHANGELOG.md section.
+    - scripts/changelog.sh notes "$CI_COMMIT_TAG" > release_notes.md
   release:
     name: "Release $CI_COMMIT_TAG"
     description: release_notes.md
-    tag_name: "$CI_COMMIT_TAG"
-    ref: "$CI_COMMIT_TAG"
+    tag_name: $CI_COMMIT_TAG
     assets:
       links:
-        - name: "Source Code (tar.gz)"
-          url: "${CI_PROJECT_URL}/-/archive/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.tar.gz"
-          link_type: "package"
-        - name: "Source Code (zip)"
-          url: "${CI_PROJECT_URL}/-/archive/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-${CI_COMMIT_TAG}.zip"
-          link_type: "package"
-        - name: "SHA256 Checksums"
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/SHA256SUMS.txt"
-          link_type: "other"
+        - name: "Source (tar.gz)"
+          url: "$CI_PROJECT_URL/-/archive/$CI_COMMIT_TAG/$CI_PROJECT_NAME-$CI_COMMIT_TAG.tar.gz"
+        - name: "Source (zip)"
+          url: "$CI_PROJECT_URL/-/archive/$CI_COMMIT_TAG/$CI_PROJECT_NAME-$CI_COMMIT_TAG.zip"
         - name: "CHANGELOG"
-          url: "${CI_PROJECT_URL}/-/blob/${CI_COMMIT_TAG}/CHANGELOG.md"
-          link_type: "other"
+          url: "$CI_PROJECT_URL/-/blob/$CI_COMMIT_TAG/CHANGELOG.md"
+        - name: "SBOM (CycloneDX)"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/sbom/$CI_COMMIT_TAG/sbom.cdx.json"

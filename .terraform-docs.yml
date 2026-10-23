@@ -1,0 +1,6 @@
+# Deterministic README generation: never read the (gitignored) provider lock
+# file, so local runs and CI render the same Providers table (constraints).
+formatter: "markdown table"
+
+settings:
+  lockfile: false
