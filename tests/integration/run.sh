@@ -229,12 +229,15 @@ assert [v["key"] for v in s["variables"]] == ["IT_SCHEDULE_SECRET"], "schedule v
   DEPLOY_USER=$(output_field deploy_tokens "$k_dt" username)
   DEPLOY_TOKEN=$(output_field deploy_tokens "$k_dt" token)
   export DEPLOY_USER DEPLOY_TOKEN
-  # Only the deploy token authenticates: system and global git config (a CI
-  # runner can add URL rewrites or helpers carrying its job token) are ignored,
-  # and git never prompts. Errors are kept, without the token, for the log.
+  # Only the deploy token authenticates. A CI runner hands git its job token
+  # (gitlab.com then answers "Authentication by CI/CD job token not allowed"),
+  # so every other credential source is cut off: system and global config,
+  # config passed through the environment, and ~/.netrc (HOME is the work
+  # directory). git never prompts; errors are kept, without the token.
   deploy_ls() {
     # shellcheck disable=SC2016 # git expands the helper at run time, so the token stays out of argv
-    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
+    env -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT HOME="$work" GIT_CONFIG_NOSYSTEM=1 \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
       -c 'credential.helper=!f() { echo "username=$DEPLOY_USER"; echo "password=$DEPLOY_TOKEN"; }; f' \
       ls-remote --heads "$repo_url" main >/dev/null 2>"$work/git.err"
   }
