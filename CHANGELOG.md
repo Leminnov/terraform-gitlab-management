@@ -7,6 +7,8 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+## [13.0.0] - 2026-10-23
+
 ### Changed (breaking)
 
 - Keys of `group_variables`, `project_variables`, `deploy_tokens`, `pipeline_schedules`, `gitlab_runners`, `gitlab_group_access_token` and `gitlab_project_access_token` can no longer contain `:`, which the objects nested in `groups` and `projects` use in their keys. Upgrade: rename such an entry and move each of its resources, or they are replaced; for an entry `ci:lint` of `group_variables` on group `org/a` renamed `ci_lint`: `moved { from = module.<name>.gitlab_group_variable.this["ci:lint_org/a"] to = module.<name>.gitlab_group_variable.this["ci_lint_org/a"] }`.
