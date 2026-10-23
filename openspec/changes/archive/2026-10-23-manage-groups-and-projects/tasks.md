@@ -9,7 +9,8 @@
   Verify `mise install` succeeds and `mise ls --current` shows every pin.
 - [x] 1.2 `.pre-commit-config.yaml`: pre-commit-terraform v1.109.3 with the `DEVIATION(terraform-repo-precommit)` comment. Verify `pre-commit run -a` passes twice in a row (the second run changes nothing).
 - [x] 1.3 CI copies: `MISE_VERSION`, `TRIVY_VERSION` and `TOFU_VERSION` in `.gitlab/global.yml`; matrix `["1.11.14", "1.13.2"]` in `.gitlab/release.yml`; `alpine:3.24` in `release.yml` and `integration.yml`; `ubuntu:26.04` in `pre-commit.yml`. Verify every image tag with the registry manifest API, that each `*_VERSION` equals its `mise.toml` pin, and that the Renovate custom managers still match (the regex dry run from adopt-store-standards 1.8).
-- [ ] 1.4 CHANGELOG `[Unreleased]` Changed entry for the toolchain. Verify `tofu fmt -check -recursive`, `tofu validate`, `mise run test`, `mise run scan` and `pre-commit run -a` pass, and that the MR 1 pipeline is green.
+- [x] 1.4 CHANGELOG `[Unreleased]` Changed entry for the toolchain. Verify `tofu fmt -check -recursive`, `tofu validate`, `mise run test`, `mise run scan` and `pre-commit run -a` pass, and that the MR 1 pipeline is green.
+  - MR !5 pipeline 2980810877 green (all groups in one MR, by maintainer decision).
 
 ## 2. Group hierarchy and file layout (MR 2)
 
@@ -103,7 +104,8 @@
 - [x] 7.2 Extend `tests/integration/main.tf` and `run.sh` `MODE=owner` with the tree of design 11 (generated deploy key, member ID from the least-privilege token, permanent-removal flags) and its API assertions. Verify `bash -n`, shellcheck, and a mock-provider plan of the fixture in both modes without warnings.
 - [ ] 7.3 Run `mise run test-integration` against the sandbox with the maintainer's tokens passed per command, only when the user asks (carried 7.3). All three modes pass. Fold any read-back finding into the code, its test and its spec in this change, including the protected-branch argument choice of design 4.
   - 2026-10-23, on `leminnov/test` (project `leminnov/test/sandbox`) with the maintainer's personal token: `MODE=owner` PASS on the third run. Findings folded in: `hooks[*].signing_token` must be `whsec_` + base64 of 32 bytes (new validation); on gitlab.com Free, access tokens need Premium (fixture detects and skips them, membership uses the owner token's user at `owner`); `run.sh` passed `mode` to the first plan only and indexed `output_field` the wrong way round, and dropped the state when destroy failed (all fixed). `allowed_to_push` / `allowed_to_merge` read back unchanged (design 4 settled). `MODE=upgrade` PASS on the second run, once the v12 template used `ref = "refs/heads/main"` (gitlab.com reads a short ref back in full, which provider 18.11 rejects), with the access token skipped on Free like owner mode. `least` not run: it needs a second account's Maintainer token, so CI and `mise run test-integration` now skip it, saying so, when `GITLAB_TOKEN_LEAST` is unset. CI variables `GITLAB_TOKEN` (the maintainer's personal token, protected, masked and hidden), `SANDBOX_GROUP_ID` and `SANDBOX_PROJECT_ID` created on the project for 7.4.
-- [ ] 7.4 After MR 5 merges, the `develop` pipeline runs `test:integration:gitlab` green (carried 7.4).
+- [x] 7.4 After MR 5 merges, the `develop` pipeline runs `test:integration:gitlab` green (carried 7.4).
+  - develop pipeline 2981220878 green with `test:integration:gitlab`: owner PASS, upgrade PASS, least skipped (no `GITLAB_TOKEN_LEAST`). Getting there took !6, !7 and !8: the deploy token check now runs git outside the CI checkout, whose `.git/config` carries the runner's job token.
 - [ ] 7.5 Docs from the run (carried 7.5), checked by running the documented commands:
   - `SECURITY.md` minimum role per resource (from `MODE=least`) and the Owner requirement for the tree;
   - the README compatibility row: OpenTofu, provider 19.5.0, gitlab.com, what was applied, Premium untested;
@@ -123,11 +125,18 @@
 
 ## 9. Integration checks (carries adopt-store-standards 9.1, 9.3)
 
-- [ ] 9.1 Full local run, all passing, with the output reported as-is (carried 9.1): `tofu fmt -check -recursive`, `tofu init -backend=false && tofu validate`, `tflint --recursive`, `mise run test`, `mise run scan`, `pre-commit run -a`, `mise run spec-validate` and `mise run test-integration`.
+- [x] 9.1 Full local run, all passing, with the output reported as-is (carried 9.1): `tofu fmt -check -recursive`, `tofu init -backend=false && tofu validate`, `tflint --recursive`, `mise run test`, `mise run scan`, `pre-commit run -a`, `mise run spec-validate` and `mise run test-integration`.
+  - Local gates all pass (fmt, validate, tflint, 164 unit runs, scan, pre-commit, spec-validate); `mise run test-integration` owner and upgrade PASS, least skipped as designed without `GITLAB_TOKEN_LEAST`.
 - [x] 9.2 Audit every store spec again. Each is met or covered by a `DEVIATION(<spec-id>)`; list them in the summary. Expected: `terraform-variables`, `repository-versioning`, `terraform-outputs`, `repository-gitlab-ci`, `terraform-repo-precommit`, and the GitLab project settings left to the maintainer.
-- [ ] 9.3 The five MRs are merged into `develop` in order, each with the template filled and a green pipeline, and the `develop` pipeline, including `test:integration:gitlab`, is green (carried 9.3).
+- [x] 9.3 The five MRs are merged into `develop` in order, each with the template filled and a green pipeline, and the `develop` pipeline, including `test:integration:gitlab`, is green (carried 9.3).
+  - One MR !5 instead of five, by maintainer decision, plus follow-ups !6, !7, !8; each pipeline green, develop pipeline green including the integration job. No second approver exists on the project (gitlab-merge-requests), as for the earlier MRs.
 
 ## Workflow follow-up
 
 - Archive this change after the last MR merges and the sandbox run passes (`/openspec-archive-change`).
 - Merge `develop` into `main` and cut `v13.0.0` with `mise run release major --push`; check that the tag pipeline creates the release from the CHANGELOG section.
+
+## Open at archive (2026-10-23)
+
+- 7.1 / 7.3: `GITLAB_TOKEN_LEAST` needs a second account's Maintainer token (a Free group has no access tokens), so `MODE=least` has not run; CI skips it and says so.
+- 7.5: the minimum role per resource in `SECURITY.md` comes from `MODE=least` and is still to be written; README compatibility and `TESTING.md` are done.
