@@ -161,9 +161,11 @@ One line per spec (its Purpose), to pick what to fetch with `openspec show <spec
 3. The referenced store standards (`quality`, `repository`, `terraform`, `git`, `gitlab`, `secrets`, `openspec`)
 4. Existing patterns in this repository (`openspec/specs/` describes the current contract)
 
-Standing deviation: pre-commit-terraform v1.109.3, one patch above the `terraform`
-store's v1.109.1 (`DEVIATION(terraform-repo-precommit)` in `.pre-commit-config.yaml`), by
-maintainer decision to run the latest stable toolchain.
+Standing deviations, by maintainer decision to run the latest stable toolchain:
+pre-commit-terraform v1.109.3, one patch above the `terraform` store's v1.109.1
+(`DEVIATION(terraform-repo-precommit)` in `.pre-commit-config.yaml`), and the pre-commit
+job on `ubuntu:26.04` instead of the `repository` store's `ubuntu:24.04`
+(`DEVIATION(repository-gitlab-ci)` in `.gitlab/pre-commit.yml`).
 
 Never deviate silently: add a `# DEVIATION(<spec-id>): <reason>` comment and list it
 in your summary.

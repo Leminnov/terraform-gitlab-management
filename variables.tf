@@ -487,11 +487,11 @@ variable "groups" {
       - archive_on_destroy                : Archive the group instead of deleting it on destroy; default true.
       - permanently_remove_on_delete      : With archive_on_destroy = false, remove the group at once instead of scheduling the deletion; default false.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
-      - deploy_tokens : Deploy tokens keyed by name: username, expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
+      - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
-      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD).
-      - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD).
-      - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600).
+      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
+      - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600; null: no runner limit).
       - labels        : Labels keyed by name: color (#RRGGBB or a CSS colour name), description.
       - badges        : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
       - hooks         : Premium. Group webhooks keyed by name, with the fields of projects[*].hooks plus subgroup_events and project_events (default false).
@@ -738,22 +738,22 @@ variable "projects" {
       - archive_on_destroy            : Archive the project instead of deleting it on destroy; default true.
       - permanently_delete_on_destroy : With archive_on_destroy = false, delete the project at once instead of scheduling the deletion; default false.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
-      - deploy_tokens : Deploy tokens keyed by name: username, expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
+      - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
-      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD).
-      - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD).
-      - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600).
+      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
+      - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600; null: no runner limit).
       - deploy_keys         : SSH deploy keys keyed by title: key (OpenSSH public key), expires_at (required, RFC 3339), can_push (default false).
       - pipeline_schedules  : Schedules keyed by description: ref (full ref, default refs/heads/<default_branch>), cron (5 fields), active (default true), variables (redacted in plans).
       - pipeline_triggers   : Set of pipeline trigger descriptions; their tokens are in the pipeline_trigger_tokens output.
-      - environments        : Environments keyed by name: tier (production, staging, testing, development, other), external_url, description.
+      - environments        : Environments keyed by name: tier (production, staging, testing, development, other; null: GitLab infers it from the name), external_url, description.
       - labels              : Labels keyed by name: color (#RRGGBB or a CSS colour name), description, priority (>= 0).
       - badges              : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
       - hooks               : Webhooks keyed by name: url (http(s)), push_events (default true), tag_push_events, merge_requests_events, pipeline_events, job_events, deployment_events, releases_events, issues_events, note_events (default false), enable_ssl_verification (default true), token and signing_token (redacted in plans, stored in state).
       - approval_rules          : Premium. Approval rules keyed by name: approvals_required (>= 0), user_ids, group_ids, applies_to_all_protected_branches (default true).
       - merge_request_approvals : Premium. When set: reset_approvals_on_push (default true), merge_requests_author_approval (default false), merge_requests_disable_committers_approval and disable_overriding_approvers_per_merge_request (default true).
-      - push_rules              : Premium. When set: prevent_secrets, deny_delete_tag and member_check (default true), reject_unsigned_commits, commit_message_regex, branch_name_regex, author_email_regex, max_file_size (MB).
-      - protected_environments  : Premium. Protected environments keyed by a name declared in environments: deploy_access_level (developer or maintainer (default)), required_approvals.
+      - push_rules              : Premium. When set: prevent_secrets, deny_delete_tag and member_check (default true), reject_unsigned_commits, commit_message_regex, branch_name_regex, author_email_regex, max_file_size (MB); null keeps GitLab's default (off, no limit).
+      - protected_environments  : Premium. Protected environments keyed by a name declared in environments: deploy_access_level (developer or maintainer (default)), required_approvals (null: deploys need no approval).
       - job_token_allowlist : When set, only the job tokens of this project and of the listed projects and groups (keys of projects / groups, or existing project_ids / group_ids) may access the project; null leaves GitLab's default.
   EOT
   type = map(object({

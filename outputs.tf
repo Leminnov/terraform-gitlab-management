@@ -1,6 +1,6 @@
-# Outputs follow the resource order of main.tf. Tokens are sensitive and land
-# in state (SECURITY.md); no output returns a CI variable value, which the
-# caller already holds.
+# Outputs follow the resource order of the themed files listed in main.tf.
+# Tokens are sensitive and land in state (SECURITY.md); no output returns a CI
+# variable value, which the caller already holds.
 # DEVIATION(terraform-outputs): the kept outputs keep their v12 names
 # (group_access_tokens, pipeline_schedule_ids, ...) rather than the plural of
 # their input, to avoid renaming outputs that consumers read; input renames are
@@ -25,16 +25,6 @@ output "projects" {
   }
 }
 
-output "group_variables_ids" {
-  description = "IDs of the group CI/CD variables, in the form <group>:<key>:<environment_scope>"
-  value       = [for k, v in gitlab_group_variable.this : v.id]
-}
-
-output "project_variables_ids" {
-  description = "IDs of the project CI/CD variables, in the form <project>:<key>:<environment_scope>"
-  value       = [for k, v in gitlab_project_variable.this : v.id]
-}
-
 output "deploy_tokens" {
   description = "Group deploy tokens keyed \"<entry>_<group>\" (deploy_tokens input) or \"<group key>:<name>\" (groups input): id, group, name, username, token, expires_at and scopes. Sensitive; username and token log in to the group's repositories and registries."
   value = {
@@ -49,58 +39,6 @@ output "deploy_tokens" {
     }
   }
   sensitive = true
-}
-
-output "project_deploy_tokens" {
-  description = "Project deploy tokens keyed \"<project key>:<name>\": id, project, name, username, token, expires_at and scopes. Sensitive; username and token log in to the project's repository and registries."
-  value = {
-    for k, v in gitlab_project_deploy_token.this : k => {
-      id         = v.id
-      project    = v.project
-      name       = v.name
-      username   = v.username
-      token      = v.token
-      expires_at = v.expires_at
-      scopes     = v.scopes
-    }
-  }
-  sensitive = true
-}
-
-output "pipeline_schedule_ids" {
-  description = "GitLab pipeline schedule IDs keyed like the pipeline_schedules input, or \"<project key>:<description>\" for created projects"
-  value       = { for k, v in gitlab_pipeline_schedule.this : k => v.pipeline_schedule_id }
-}
-
-output "pipeline_trigger_tokens" {
-  description = "Pipeline trigger tokens keyed \"<project key>:<description>\", for triggering the project's pipelines through the API. Sensitive."
-  value       = { for k, v in gitlab_pipeline_trigger.this : k => v.token }
-  sensitive   = true
-}
-
-output "gitlab_runners" {
-  description = "Runners keyed like the gitlab_runners input, or \"<owner key>:<name>\" for created groups and projects: id (the GitLab runner ID), runner_type, description, group_id, project_id, access_level, tag_list, maximum_timeout, paused, untagged and locked"
-  value = {
-    for k, v in gitlab_user_runner.this : k => {
-      id              = v.id
-      runner_type     = v.runner_type
-      description     = v.description
-      group_id        = v.group_id
-      project_id      = v.project_id
-      access_level    = v.access_level
-      tag_list        = v.tag_list
-      maximum_timeout = v.maximum_timeout
-      paused          = v.paused
-      untagged        = v.untagged
-      locked          = v.locked
-    }
-  }
-}
-
-output "gitlab_runner_tokens" {
-  description = "Runner authentication tokens (glrt-...) keyed like the gitlab_runners output, for registering the runner manager. Sensitive."
-  value       = { for k, v in gitlab_user_runner.this : k => v.token }
-  sensitive   = true
 }
 
 output "group_access_tokens" {
@@ -133,4 +71,66 @@ output "project_access_tokens" {
     }
   }
   sensitive = true
+}
+
+output "project_deploy_tokens" {
+  description = "Project deploy tokens keyed \"<project key>:<name>\": id, project, name, username, token, expires_at and scopes. Sensitive; username and token log in to the project's repository and registries."
+  value = {
+    for k, v in gitlab_project_deploy_token.this : k => {
+      id         = v.id
+      project    = v.project
+      name       = v.name
+      username   = v.username
+      token      = v.token
+      expires_at = v.expires_at
+      scopes     = v.scopes
+    }
+  }
+  sensitive = true
+}
+
+output "group_variables_ids" {
+  description = "IDs of the group CI/CD variables, in the form <group>:<key>:<environment_scope>"
+  value       = [for k, v in gitlab_group_variable.this : v.id]
+}
+
+output "project_variables_ids" {
+  description = "IDs of the project CI/CD variables, in the form <project>:<key>:<environment_scope>"
+  value       = [for k, v in gitlab_project_variable.this : v.id]
+}
+
+output "pipeline_schedule_ids" {
+  description = "GitLab pipeline schedule IDs keyed like the pipeline_schedules input, or \"<project key>:<description>\" for created projects"
+  value       = { for k, v in gitlab_pipeline_schedule.this : k => v.pipeline_schedule_id }
+}
+
+output "gitlab_runners" {
+  description = "Runners keyed like the gitlab_runners input, or \"<owner key>:<name>\" for created groups and projects: id (the GitLab runner ID), runner_type, description, group_id, project_id, access_level, tag_list, maximum_timeout, paused, untagged and locked"
+  value = {
+    for k, v in gitlab_user_runner.this : k => {
+      id              = v.id
+      runner_type     = v.runner_type
+      description     = v.description
+      group_id        = v.group_id
+      project_id      = v.project_id
+      access_level    = v.access_level
+      tag_list        = v.tag_list
+      maximum_timeout = v.maximum_timeout
+      paused          = v.paused
+      untagged        = v.untagged
+      locked          = v.locked
+    }
+  }
+}
+
+output "gitlab_runner_tokens" {
+  description = "Runner authentication tokens (glrt-...) keyed like the gitlab_runners output, for registering the runner manager. Sensitive."
+  value       = { for k, v in gitlab_user_runner.this : k => v.token }
+  sensitive   = true
+}
+
+output "pipeline_trigger_tokens" {
+  description = "Pipeline trigger tokens keyed \"<project key>:<description>\", for triggering the project's pipelines through the API. Sensitive."
+  value       = { for k, v in gitlab_pipeline_trigger.this : k => v.token }
+  sensitive   = true
 }

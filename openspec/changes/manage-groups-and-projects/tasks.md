@@ -123,7 +123,7 @@
 ## 9. Integration checks (carries adopt-store-standards 9.1, 9.3)
 
 - [ ] 9.1 Full local run, all passing, with the output reported as-is (carried 9.1): `tofu fmt -check -recursive`, `tofu init -backend=false && tofu validate`, `tflint --recursive`, `mise run test`, `mise run scan`, `pre-commit run -a`, `mise run spec-validate` and `mise run test-integration`.
-- [ ] 9.2 Audit every store spec again. Each is met or covered by a `DEVIATION(<spec-id>)`; list them in the summary. Expected: `terraform-variables`, `repository-versioning`, `terraform-outputs`, `repository-gitlab-ci`, `terraform-repo-precommit`, and the GitLab project settings left to the maintainer.
+- [x] 9.2 Audit every store spec again. Each is met or covered by a `DEVIATION(<spec-id>)`; list them in the summary. Expected: `terraform-variables`, `repository-versioning`, `terraform-outputs`, `repository-gitlab-ci`, `terraform-repo-precommit`, and the GitLab project settings left to the maintainer.
 - [ ] 9.3 The five MRs are merged into `develop` in order, each with the template filled and a green pipeline, and the `develop` pipeline, including `test:integration:gitlab`, is green (carried 9.3).
 
 ## Workflow follow-up
