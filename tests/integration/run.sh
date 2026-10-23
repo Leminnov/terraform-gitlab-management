@@ -229,13 +229,25 @@ assert [v["key"] for v in s["variables"]] == ["IT_SCHEDULE_SECRET"], "schedule v
   DEPLOY_USER=$(output_field deploy_tokens "$k_dt" username)
   DEPLOY_TOKEN=$(output_field deploy_tokens "$k_dt" token)
   export DEPLOY_USER DEPLOY_TOKEN
+  # Only the deploy token authenticates: system and global git config (a CI
+  # runner can add URL rewrites or helpers carrying its job token) are ignored,
+  # and git never prompts. Errors are kept, without the token, for the log.
   deploy_ls() {
     # shellcheck disable=SC2016 # git expands the helper at run time, so the token stays out of argv
-    git -c credential.helper= \
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
       -c 'credential.helper=!f() { echo "username=$DEPLOY_USER"; echo "password=$DEPLOY_TOKEN"; }; f' \
-      ls-remote --heads "$repo_url" main >/dev/null 2>&1
+      ls-remote --heads "$repo_url" main >/dev/null 2>"$work/git.err"
   }
-  deploy_ls || fail "the deploy token cannot read the sandbox project"
+  # A new token can take a few seconds to be accepted.
+  local try
+  for try in 1 2 3 4 5 6; do
+    deploy_ls && break
+    [ "$try" -lt 6 ] || {
+      grep -vF "$DEPLOY_TOKEN" "$work/git.err" >&2 || true
+      fail "the deploy token cannot read the sandbox project"
+    }
+    sleep 5
+  done
   log "deploy token reads the project"
 
   if ! $access_tokens; then
