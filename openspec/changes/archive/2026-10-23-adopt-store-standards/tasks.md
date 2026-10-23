@@ -117,3 +117,4 @@
   - the default-branch decision.
 - Archive the change after the last MR merges (`/openspec-archive-change`), so `openspec/specs/` holds the seven capabilities.
 - Cut `v13.0.0` on `main` with `mise run release major --push`, and check that the tag pipeline creates the release from the CHANGELOG section.
+- Archived on 2026-10-23 with tasks 7.1, 7.3, 7.4, 7.5, 9.1 and 9.3 open: they all wait on the gitlab.com sandbox and are carried over to the change `manage-groups-and-projects`, whose integration run covers both changes.

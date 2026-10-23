@@ -1,0 +1,93 @@
+# Spec Delta
+
+## ADDED Requirements
+
+### Requirement: Public visibility
+The module SHALL warn when a created group or project sets `visibility = "public"`, since a public group or project is an explicit, reviewed decision (`gitlab-project-settings`).
+
+#### Scenario: Public project
+- **WHEN** project `tools/site` sets `visibility = "public"`
+- **THEN** the plan succeeds with a warning naming `projects["tools/site"]`
+
+### Requirement: Force push on protected branches
+The module SHALL warn when a protected branch of a created project sets `allow_force_push = true`.
+
+#### Scenario: Force push allowed on main
+- **WHEN** a project sets `protected_branches = { main = { allow_force_push = true } }`
+- **THEN** the plan warns naming the project and the branch
+
+### Requirement: Webhook TLS verification
+The module SHALL warn when a project or group webhook sets `enable_ssl_verification = false`.
+
+#### Scenario: Hook without TLS verification
+- **WHEN** a project hook sets `enable_ssl_verification = false`
+- **THEN** the plan warns naming the hook
+
+### Requirement: Deploy key write access
+The module SHALL warn when a deploy key sets `can_push = true`.
+
+#### Scenario: Writable deploy key
+- **WHEN** a deploy key sets `can_push = true`
+- **THEN** the plan warns naming the deploy key
+
+## MODIFIED Requirements
+
+### Requirement: Secret-looking variables masked and protected
+The module SHALL warn when a group or project variable, standalone or nested in a created group or project, whose key contains, case-insensitively, `TOKEN`, `PASSWORD`, `PASSWD`, `SECRET`, `PRIVATE_KEY`, `API_KEY` or `CREDENTIAL` is not both `masked = true` and `protected = true`.
+
+#### Scenario: Unmasked password
+- **WHEN** a `group_variables` entry sets `key = "REGISTRY_PASSWORD"` and `masked = false`
+- **THEN** the plan succeeds with a warning naming `REGISTRY_PASSWORD` and its group and asking for `masked = true` and `protected = true`
+
+#### Scenario: Unprotected project token variable
+- **WHEN** a `project_variables` entry sets `key = "deploy_token"`, `masked = true` and `protected = false`
+- **THEN** the plan warns for that variable
+
+#### Scenario: Non-secret key
+- **WHEN** a variable sets `key = "LOG_LEVEL"` with the default flags
+- **THEN** no guardrail warning is emitted
+
+#### Scenario: Nested secret variable
+- **WHEN** project `platform/api` declares the variable `API_KEY` with the default flags
+- **THEN** the plan warns naming `platform/api:API_KEY`
+
+### Requirement: Token lifetime at most one year
+The module SHALL warn when a group or project deploy token, group or project access token, standalone or nested, or a deploy key has an `expires_at` more than 366 days after the plan time (`secrets-rotation`).
+
+#### Scenario: Two-year deploy token
+- **WHEN** a deploy token sets `expires_at` two years after today
+- **THEN** the plan succeeds with a warning naming the token and the one-year limit
+
+#### Scenario: Six-month access token
+- **WHEN** a group access token expires six months after today
+- **THEN** no lifetime warning is emitted
+
+#### Scenario: Two-year deploy key
+- **WHEN** a deploy key expires two years after today
+- **THEN** the plan warns naming the deploy key
+
+### Requirement: Access token privilege
+The module SHALL warn when a group or project access token, standalone or nested, sets `access_level = "owner"` or leaves it `null`, in which case GitLab grants `maintainer`.
+
+#### Scenario: Owner token
+- **WHEN** a group access token sets `access_level = "owner"`
+- **THEN** the plan warns naming the token and asking for the lowest level that works
+
+#### Scenario: Level left to the server default
+- **WHEN** a project access token omits `access_level`
+- **THEN** the plan warns that GitLab will grant `maintainer`
+
+#### Scenario: Developer token
+- **WHEN** a project access token sets `access_level = "developer"`
+- **THEN** no privilege warning is emitted
+
+### Requirement: No warning on defaults
+A call that sets only non-secret variables, tokens and deploy keys expiring within a year, explicit non-owner access levels, private groups and projects with the default protections, read-only deploy keys and hooks with TLS verification SHALL produce no guardrail warning.
+
+#### Scenario: Clean configuration
+- **WHEN** the unit suite plans the clean configuration
+- **THEN** the run passes with no `expect_failures` and no check warning
+
+#### Scenario: Complete example
+- **WHEN** `examples/complete` is planned
+- **THEN** no guardrail warning is emitted
