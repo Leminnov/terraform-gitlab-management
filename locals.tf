@@ -195,7 +195,7 @@ locals {
 
   deploy_keys = merge([
     for pk, pr in var.projects : {
-      for title, d in pr.deploy_keys : "${pk}:${title}" => merge(d, { project = local.project_ids[pk], title = title })
+      for title, d in pr.deploy_keys : "${pk}:${title}" => merge(d, { project = local.project_ids[pk], project_key = pk, title = title })
     }
   ]...)
 
@@ -277,7 +277,29 @@ locals {
 
   project_hooks = merge([
     for pk, pr in var.projects : {
-      for name, h in pr.hooks : "${pk}:${name}" => merge(h, { project = local.project_ids[pk], name = name })
+      for name, h in pr.hooks : "${pk}:${name}" => merge(h, { project = local.project_ids[pk], project_key = pk, name = name })
+    }
+  ]...)
+
+  # Premium objects: empty unless the caller sets them.
+  group_hooks = merge([
+    for gk, g in var.groups : {
+      for name, h in g.hooks : "${gk}:${name}" => merge(h, { group = local.group_ids[gk], group_key = gk, name = name })
+    }
+  ]...)
+
+  project_approval_rules = merge([
+    for pk, pr in var.projects : {
+      for name, r in pr.approval_rules : "${pk}:${name}" => merge(r, { project = local.project_ids[pk], name = name })
+    }
+  ]...)
+
+  project_mr_approvals = { for pk, pr in var.projects : pk => merge(pr.merge_request_approvals, { project = local.project_ids[pk] }) if pr.merge_request_approvals != null }
+  project_push_rules   = { for pk, pr in var.projects : pk => merge(pr.push_rules, { project = local.project_ids[pk] }) if pr.push_rules != null }
+
+  project_protected_environments = merge([
+    for pk, pr in var.projects : {
+      for name, e in pr.protected_environments : "${pk}:${name}" => merge(e, { project = local.project_ids[pk], environment = "${pk}:${name}" })
     }
   ]...)
 
@@ -296,8 +318,8 @@ locals {
   project_protected_branches = merge([
     for pk, v in var.projects : {
       for name, b in(v.protected_branches != null ? v.protected_branches : merge(
-        { (v.default_branch) = { push_access_level = "maintainer", merge_access_level = "maintainer", allow_force_push = false } },
-        contains(keys(v.branches), "develop") ? { develop = { push_access_level = "developer", merge_access_level = "developer", allow_force_push = false } } : {},
+        { (v.default_branch) = { push_access_level = "maintainer", merge_access_level = "maintainer", allow_force_push = false, code_owner_approval_required = null } },
+        contains(keys(v.branches), "develop") ? { develop = { push_access_level = "developer", merge_access_level = "developer", allow_force_push = false, code_owner_approval_required = null } } : {},
       )) : "${pk}:${name}" => merge(b, { project = pk, branch = name })
     }
   ]...)

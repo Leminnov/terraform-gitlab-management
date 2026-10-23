@@ -49,6 +49,10 @@ Each `protected_environments` entry of a project SHALL protect the environment n
 - **WHEN** `protected_environments` names `staging`, which is not in `environments`
 - **THEN** the plan fails with "protected_environments keys must be declared in the project's environments."
 
+#### Scenario: Unknown deploy level
+- **WHEN** a protected environment sets `deploy_access_level = "owner"`
+- **THEN** the plan fails with "protected_environments[*].deploy_access_level must be developer or maintainer, and required_approvals null or >= 0."
+
 ### Requirement: Group webhooks
 Each `hooks` entry of a group SHALL create a group webhook with the same arguments, defaults and validation as project webhooks, plus `subgroup_events` and `project_events`.
 

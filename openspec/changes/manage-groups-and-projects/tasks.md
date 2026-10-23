@@ -87,10 +87,10 @@
 
 ## 6. Premium features and guardrails (MR 4)
 
-- [ ] 6.1 `premium.tf`: approval rules, merge request approval settings, push rules, protected environments and group hooks; `code_owner_approval_required` only when set. Validations from the `premium-features` spec. Verify `tofu validate`.
-- [ ] 6.2 `tests/premium.tftest.hcl`: a run with no Premium setting asserting none of the five resources and no `code_owner_approval_required`; a run per feature asserting its defaults; one rejected-input run per validation. Verify `mise run test`.
-- [ ] 6.3 `checks.tf`: `public_visibility`, `protected_branch_force_push`, `webhook_ssl_verification`, `deploy_key_write_access`, and deploy keys added to `token_lifetime`. `tests/guardrails.tftest.hcl`: one run per new check, the nested cases of the three existing checks, and the clean run. Verify `mise run test`, the check mutation (neutralise each condition, its run fails) and that `examples/complete` plans without warnings.
-- [ ] 6.4 README Security Considerations (new warnings) and Known Limitations (top-level groups, archive keeps the path, CE protected branches, Premium untested); CHANGELOG. Verify `pre-commit run -a`.
+- [x] 6.1 `premium.tf`: approval rules, merge request approval settings, push rules, protected environments and group hooks; `code_owner_approval_required` only when set. Validations from the `premium-features` spec. Verify `tofu validate`.
+- [x] 6.2 `tests/premium.tftest.hcl`: a run with no Premium setting asserting none of the five resources and no `code_owner_approval_required`; a run per feature asserting its defaults; one rejected-input run per validation. Verify `mise run test`.
+- [x] 6.3 `checks.tf`: `public_visibility`, `protected_branch_force_push`, `webhook_ssl_verification`, `deploy_key_write_access`, and deploy keys added to `token_lifetime`. `tests/guardrails.tftest.hcl`: one run per new check, the nested cases of the three existing checks, and the clean run. Verify `mise run test`, the check mutation (neutralise each condition, its run fails) and that `examples/complete` plans without warnings.
+- [x] 6.4 README Security Considerations (new warnings) and Known Limitations (top-level groups, archive keeps the path, CE protected branches, Premium untested); CHANGELOG. Verify `pre-commit run -a`.
 
 ## 7. Integration fixture and sandbox (MR 5, carries adopt-store-standards 7.1, 7.3, 7.4, 7.5)
 

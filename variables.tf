@@ -494,6 +494,7 @@ variable "groups" {
       - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600).
       - labels        : Labels keyed by name: color (#RRGGBB or a CSS colour name), description.
       - badges        : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
+      - hooks         : Premium. Group webhooks keyed by name, with the fields of projects[*].hooks plus subgroup_events and project_events (default false).
   EOT
   type = map(object({
     name                              = optional(string)
@@ -549,6 +550,24 @@ variable "groups" {
     badges = optional(map(object({
       link_url  = string
       image_url = string
+    })), {})
+    # Premium
+    hooks = optional(map(object({
+      url                     = string
+      push_events             = optional(bool, true)
+      tag_push_events         = optional(bool, false)
+      merge_requests_events   = optional(bool, false)
+      pipeline_events         = optional(bool, false)
+      job_events              = optional(bool, false)
+      deployment_events       = optional(bool, false)
+      releases_events         = optional(bool, false)
+      issues_events           = optional(bool, false)
+      note_events             = optional(bool, false)
+      enable_ssl_verification = optional(bool, true)
+      token                   = optional(string)
+      signing_token           = optional(string)
+      subgroup_events         = optional(bool, false)
+      project_events          = optional(bool, false)
     })), {})
   }))
   default = {}
@@ -692,6 +711,11 @@ variable "groups" {
     condition     = alltrue(flatten([for o in values(var.groups) : [for b in values(o.badges) : can(regex("^https?://", b.link_url)) && can(regex("^https?://", b.image_url))]]))
     error_message = "badges[*] link_url and image_url must start with http:// or https://."
   }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for h in values(o.hooks) : can(regex("^https?://", h.url))]]))
+    error_message = "hooks[*].url must start with http:// or https://."
+  }
 }
 
 variable "projects" {
@@ -704,7 +728,7 @@ variable "projects" {
       - default_branch          : Default branch, created with a README commit; default main.
       - initialize_with_readme  : Create the default branch with a README commit; default true. Must stay true for branches to be created.
       - branches                : Extra branches keyed by name, each from ref (default: the default branch); default { develop = {} }.
-      - protected_branches      : Protected branches or wildcards keyed by name, with push_access_level and merge_access_level (no one, developer, maintainer (default), admin) and allow_force_push (default false). Default: the default branch for maintainers, plus develop for developers when it is in branches.
+      - protected_branches      : Protected branches or wildcards keyed by name, with push_access_level and merge_access_level (no one, developer, maintainer (default), admin) and allow_force_push (default false). Default: the default branch for maintainers, plus develop for developers when it is in branches. Premium: code_owner_approval_required, not sent unless set.
       - protected_tags          : Protected tags or wildcards keyed by name, with create_access_level (no one, developer, maintainer (default), admin); default { "v*" = {} }.
       - merge_method            : merge (default), rebase_merge or ff.
       - squash_option           : never, always, default_on (default) or default_off.
@@ -726,6 +750,10 @@ variable "projects" {
       - labels              : Labels keyed by name: color (#RRGGBB or a CSS colour name), description, priority (>= 0).
       - badges              : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
       - hooks               : Webhooks keyed by name: url (http(s)), push_events (default true), tag_push_events, merge_requests_events, pipeline_events, job_events, deployment_events, releases_events, issues_events, note_events (default false), enable_ssl_verification (default true), token and signing_token (redacted in plans, stored in state).
+      - approval_rules          : Premium. Approval rules keyed by name: approvals_required (>= 0), user_ids, group_ids, applies_to_all_protected_branches (default true).
+      - merge_request_approvals : Premium. When set: reset_approvals_on_push (default true), merge_requests_author_approval (default false), merge_requests_disable_committers_approval and disable_overriding_approvers_per_merge_request (default true).
+      - push_rules              : Premium. When set: prevent_secrets, deny_delete_tag and member_check (default true), reject_unsigned_commits, commit_message_regex, branch_name_regex, author_email_regex, max_file_size (MB).
+      - protected_environments  : Premium. Protected environments keyed by a name declared in environments: deploy_access_level (developer or maintainer (default)), required_approvals.
       - job_token_allowlist : When set, only the job tokens of this project and of the listed projects and groups (keys of projects / groups, or existing project_ids / group_ids) may access the project; null leaves GitLab's default.
   EOT
   type = map(object({
@@ -742,6 +770,8 @@ variable "projects" {
       push_access_level  = optional(string, "maintainer")
       merge_access_level = optional(string, "maintainer")
       allow_force_push   = optional(bool, false)
+      # Premium
+      code_owner_approval_required = optional(bool)
     })))
     protected_tags = optional(map(object({
       create_access_level = optional(string, "maintainer")
@@ -812,6 +842,33 @@ variable "projects" {
       enable_ssl_verification = optional(bool, true)
       token                   = optional(string)
       signing_token           = optional(string)
+    })), {})
+    # Premium
+    approval_rules = optional(map(object({
+      approvals_required                = number
+      user_ids                          = optional(set(number), [])
+      group_ids                         = optional(set(number), [])
+      applies_to_all_protected_branches = optional(bool, true)
+    })), {})
+    merge_request_approvals = optional(object({
+      reset_approvals_on_push                        = optional(bool, true)
+      merge_requests_author_approval                 = optional(bool, false)
+      merge_requests_disable_committers_approval     = optional(bool, true)
+      disable_overriding_approvers_per_merge_request = optional(bool, true)
+    }))
+    push_rules = optional(object({
+      prevent_secrets         = optional(bool, true)
+      deny_delete_tag         = optional(bool, true)
+      member_check            = optional(bool, true)
+      reject_unsigned_commits = optional(bool)
+      commit_message_regex    = optional(string)
+      branch_name_regex       = optional(string)
+      author_email_regex      = optional(string)
+      max_file_size           = optional(number)
+    }))
+    protected_environments = optional(map(object({
+      deploy_access_level = optional(string, "maintainer")
+      required_approvals  = optional(number)
     })), {})
     deploy_keys = optional(map(object({
       key        = string
@@ -1039,5 +1096,20 @@ variable "projects" {
   validation {
     condition     = alltrue(flatten([for o in values(var.projects) : [for h in values(o.hooks) : can(regex("^https?://", h.url))]]))
     error_message = "hooks[*].url must start with http:// or https://."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.approval_rules) : r.approvals_required >= 0]]))
+    error_message = "approval_rules[*].approvals_required must be >= 0."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for e in keys(o.protected_environments) : contains(keys(o.environments), e)]]))
+    error_message = "protected_environments keys must be declared in the project's environments."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for e in values(o.protected_environments) : contains(["developer", "maintainer"], e.deploy_access_level) && (e.required_approvals == null || coalesce(e.required_approvals, 0) >= 0)]]))
+    error_message = "protected_environments[*].deploy_access_level must be developer or maintainer, and required_approvals null or >= 0."
   }
 }

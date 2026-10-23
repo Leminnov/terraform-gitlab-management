@@ -47,6 +47,8 @@ resource "gitlab_branch_protection" "this" {
   allow_force_push = each.value.allow_force_push
   allowed_to_push  = [{ access_level = each.value.push_access_level }]
   allowed_to_merge = [{ access_level = each.value.merge_access_level }]
+  # Premium; null sends nothing.
+  code_owner_approval_required = each.value.code_owner_approval_required
 }
 
 resource "gitlab_tag_protection" "this" {

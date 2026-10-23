@@ -152,13 +152,13 @@ run "less_open_subgroup_is_accepted" {
 
   variables {
     groups = {
-      public            = { visibility = "public" }
-      "public/internal" = { visibility = "internal" }
+      shared           = { visibility = "internal" }
+      "shared/private" = { visibility = "private" }
     }
   }
 
   assert {
-    condition     = gitlab_group.level_2["public/internal"].visibility_level == "internal"
+    condition     = gitlab_group.level_2["shared/private"].visibility_level == "private" && gitlab_group.level_1["shared"].visibility_level == "internal"
     error_message = "A subgroup less open than its parent must be accepted."
   }
 }
