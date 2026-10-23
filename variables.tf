@@ -716,6 +716,12 @@ variable "groups" {
     condition     = alltrue(flatten([for o in values(var.groups) : [for h in values(o.hooks) : can(regex("^https?://", h.url))]]))
     error_message = "hooks[*].url must start with http:// or https://."
   }
+
+  validation {
+    # GitLab takes the Standard Webhooks form: whsec_ and the base64 of 32 bytes.
+    condition     = alltrue(flatten([for o in values(var.groups) : [for h in values(o.hooks) : h.signing_token == null || can(regex("^whsec_[A-Za-z0-9+/]{43}=$", coalesce(h.signing_token, "-")))]]))
+    error_message = "hooks[*].signing_token must be whsec_ followed by the base64 of a 32-byte key."
+  }
 }
 
 variable "projects" {
@@ -749,7 +755,7 @@ variable "projects" {
       - environments        : Environments keyed by name: tier (production, staging, testing, development, other; null: GitLab infers it from the name), external_url, description.
       - labels              : Labels keyed by name: color (#RRGGBB or a CSS colour name), description, priority (>= 0).
       - badges              : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
-      - hooks               : Webhooks keyed by name: url (http(s)), push_events (default true), tag_push_events, merge_requests_events, pipeline_events, job_events, deployment_events, releases_events, issues_events, note_events (default false), enable_ssl_verification (default true), token and signing_token (redacted in plans, stored in state).
+      - hooks               : Webhooks keyed by name: url (http(s)), push_events (default true), tag_push_events, merge_requests_events, pipeline_events, job_events, deployment_events, releases_events, issues_events, note_events (default false), enable_ssl_verification (default true), token and signing_token (whsec_ followed by the base64 of a 32-byte key, GitLab 19.0+), both redacted in plans and stored in state.
       - approval_rules          : Premium. Approval rules keyed by name: approvals_required (>= 0), user_ids, group_ids, applies_to_all_protected_branches (default true).
       - merge_request_approvals : Premium. When set: reset_approvals_on_push (default true), merge_requests_author_approval (default false), merge_requests_disable_committers_approval and disable_overriding_approvers_per_merge_request (default true).
       - push_rules              : Premium. When set: prevent_secrets, deny_delete_tag and member_check (default true), reject_unsigned_commits, commit_message_regex, branch_name_regex, author_email_regex, max_file_size (MB); null keeps GitLab's default (off, no limit).
@@ -1096,6 +1102,12 @@ variable "projects" {
   validation {
     condition     = alltrue(flatten([for o in values(var.projects) : [for h in values(o.hooks) : can(regex("^https?://", h.url))]]))
     error_message = "hooks[*].url must start with http:// or https://."
+  }
+
+  validation {
+    # GitLab takes the Standard Webhooks form: whsec_ and the base64 of 32 bytes.
+    condition     = alltrue(flatten([for o in values(var.projects) : [for h in values(o.hooks) : h.signing_token == null || can(regex("^whsec_[A-Za-z0-9+/]{43}=$", coalesce(h.signing_token, "-")))]]))
+    error_message = "hooks[*].signing_token must be whsec_ followed by the base64 of a 32-byte key."
   }
 
   validation {

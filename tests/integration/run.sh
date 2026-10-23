@@ -7,7 +7,6 @@
 #
 # Environment:
 #   GITLAB_TOKEN         token of the mode (owner, or Maintainer for MODE=least)
-#   GITLAB_TOKEN_LEAST   MODE=owner only: the Maintainer token, whose bot user joins the tree
 #   GITLAB_BASE_URL      API URL, default https://gitlab.com/api/v4/
 #   SANDBOX_GROUP_ID     numeric ID of the sandbox group
 #   SANDBOX_PROJECT_ID   numeric ID of a project in it, with a main branch
@@ -17,7 +16,8 @@
 # server-side assertions with the created tokens (and, for owner, on the tree:
 # paths, branches, protections, merge settings, deploy key, job token allowlist,
 # trigger token), empty second plan, destroy, then the destroyed deploy token
-# must be revoked. upgrade: apply v12.0.0 on
+# must be revoked. On a gitlab.com Free namespace the group and project access
+# tokens are skipped: gitlab.com offers them on Premium and Ultimate only. upgrade: apply v12.0.0 on
 # provider 18.11, plan this module on 19.5 and require the deploy token that
 # already had an expiry to be moved without replacement and the undated one to
 # be replaced once, apply, empty second plan, destroy. Everything is destroyed
@@ -40,8 +40,10 @@ export TF_IN_AUTOMATION=1 TF_INPUT=0 TF_DATA_DIR=$work/.terraform
 # Same value for every plan of the run, about a month ahead (token_lifetime).
 expires_on=$(date -u -d '+30 days' +%Y-%m-%d 2>/dev/null || date -u -v+30d +%Y-%m-%d)
 sentinel="it-sentinel-$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"
-export TF_VAR_sentinel=$sentinel TF_VAR_group_id=$group_id TF_VAR_project_id=$project_id \
-  TF_VAR_suffix=$suffix TF_VAR_expires_on=$expires_on
+signing_token="whsec_$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+# mode as TF_VAR_ so every plan and destroy of the run sees it.
+export TF_VAR_sentinel=$sentinel TF_VAR_signing_token=$signing_token TF_VAR_group_id=$group_id \
+  TF_VAR_project_id=$project_id TF_VAR_suffix=$suffix TF_VAR_expires_on=$expires_on TF_VAR_mode=$mode
 
 log() { echo "integration[$mode]: $*"; }
 fail() {
@@ -57,11 +59,11 @@ api_as() {
 }
 api() { api_as GITLAB_TOKEN "$1"; }
 
-# Reads field $2 of key $3 of the sensitive output $1 into stdout, for capture.
+# Reads field $3 of key $2 of the sensitive output $1 into stdout, for capture.
 output_field() {
   tofu -chdir="$dir" output -json "$1" | python3 -I -c '
 import json, sys
-print(json.load(sys.stdin)[sys.argv[2]][sys.argv[1]])' "$2" "$3"
+print(json.load(sys.stdin)[sys.argv[1]][sys.argv[2]])' "$2" "$3"
 }
 
 dir=$fixture
@@ -71,10 +73,11 @@ cleanup() {
   local rc=$?
   if ! $destroyed && [ -f "$state" ]; then
     log "destroying"
-    tofu -chdir="$dir" destroy -auto-approve -no-color >/dev/null || {
-      echo "integration[$mode]: destroy failed, clean up resources suffixed $suffix by hand" >&2
-      rc=1
-    }
+    if ! tofu -chdir="$dir" destroy -auto-approve -no-color >/dev/null; then
+      # Keep the state: it lists what is left, and a later destroy can use it.
+      echo "integration[$mode]: destroy failed; state kept in $work (TF_DATA_DIR=$work/.terraform): rerun the destroy from it, or delete the resources suffixed $suffix by hand" >&2
+      exit 1
+    fi
   fi
   rm -rf "$work"
   exit "$rc"
@@ -83,30 +86,41 @@ trap cleanup EXIT
 
 init() { tofu -chdir="$dir" init -no-color -backend-config="path=$state" >/dev/null; }
 
-# Plans to $work/plan.bin; the human-readable output must not contain the sentinel.
+# Plans to $work/plan.bin; the human-readable output must contain no secret.
 plan_redacted() {
-  tofu -chdir="$dir" plan -no-color -out="$work/plan.bin" "$@" >"$work/plan.txt"
-  ! grep -qF "$sentinel" "$work/plan.txt" || fail "a secret value appears in plan output"
-  ! tofu -chdir="$dir" show -no-color "$work/plan.bin" | grep -qF "$sentinel" || fail "a secret value appears in tofu show"
+  tofu -chdir="$dir" plan -no-color -out="$work/plan.bin" >"$work/plan.txt"
+  tofu -chdir="$dir" show -no-color "$work/plan.bin" >"$work/show.txt"
+  local secret
+  for secret in "$sentinel" "$signing_token"; do
+    ! grep -qF "$secret" "$work/plan.txt" || fail "a secret value appears in plan output"
+    ! grep -qF "$secret" "$work/show.txt" || fail "a secret value appears in tofu show"
+  done
 }
 
 second_plan_empty() {
   local rc=0
   tofu -chdir="$dir" plan -no-color -detailed-exitcode >"$work/plan2.txt" || rc=$?
   [ "$rc" -eq 0 ] || {
-    sed -n '/will be\|must be/,+12p' "$work/plan2.txt" | grep -vF "$sentinel" >&2 || true
+    sed -n '/will be\|must be/,+12p' "$work/plan2.txt" | grep -vF -e "$sentinel" -e "$signing_token" >&2 || true
     fail "second plan is not empty (exit $rc)"
   }
   log "second plan empty"
 }
 
-# Owner mode: a deploy key generated for the run, and the user ID of the
-# least-privilege token's bot, added as a member of the tree's project.
+# Access tokens exist on gitlab.com only for Premium and Ultimate namespaces;
+# the namespace API reports a plan on gitlab.com only.
+access_tokens=true
+if [ "$(api "namespaces/$group_id" | python3 -I -c 'import json,sys; print(json.load(sys.stdin).get("plan") or "")')" = free ]; then
+  access_tokens=false
+fi
+export TF_VAR_access_tokens=$access_tokens
+
+# Owner mode: a deploy key generated for the run, and the owner token's own
+# user, added as a member of the tree's project.
 tree_inputs() {
-  : "${GITLAB_TOKEN_LEAST:?set GITLAB_TOKEN_LEAST: owner mode adds its bot user to the tree (TESTING.md)}"
   ssh-keygen -q -t ed25519 -N '' -C "it-$suffix" -f "$work/deploy_key"
   TF_VAR_deploy_key=$(cat "$work/deploy_key.pub")
-  TF_VAR_member_user_id=$(api_as GITLAB_TOKEN_LEAST personal_access_tokens/self | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["user_id"])')
+  TF_VAR_member_user_id=$(api user | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["id"])')
   export TF_VAR_deploy_key TF_VAR_member_user_id
 }
 
@@ -184,7 +198,7 @@ print("form = \"token=%s\"\nform = \"ref=it-no-such-ref\"" % json.load(sys.stdin
 run_apply_modes() {
   [ "$mode" != owner ] || tree_inputs
   init
-  plan_redacted -var "mode=$mode"
+  plan_redacted
   log "plan redacts every secret value"
   tofu -chdir="$dir" apply -no-color -auto-approve "$work/plan.bin" >/dev/null
   log "applied"
@@ -224,15 +238,19 @@ assert [v["key"] for v in s["variables"]] == ["IT_SCHEDULE_SECRET"], "schedule v
   deploy_ls || fail "the deploy token cannot read the sandbox project"
   log "deploy token reads the project"
 
-  # shellcheck disable=SC2034 # read by api_as through ${!var}
-  PROJECT_TOKEN=$(output_field project_access_tokens "bot_$project_id" token)
-  api_as PROJECT_TOKEN "projects/$project_id" >/dev/null || fail "the project access token cannot read its project"
-  log "project access token reads its project"
-  if [ "$mode" = owner ]; then
+  if ! $access_tokens; then
+    log "SKIPPED access tokens: gitlab.com Free namespace, they need Premium"
+  else
     # shellcheck disable=SC2034 # read by api_as through ${!var}
-    GROUP_TOKEN=$(output_field group_access_tokens "bot_$group_id" token)
-    api_as GROUP_TOKEN "groups/$group_id" >/dev/null || fail "the group access token cannot read its group"
-    log "group access token reads its group"
+    PROJECT_TOKEN=$(output_field project_access_tokens "bot_$project_id" token)
+    api_as PROJECT_TOKEN "projects/$project_id" >/dev/null || fail "the project access token cannot read its project"
+    log "project access token reads its project"
+    if [ "$mode" = owner ]; then
+      # shellcheck disable=SC2034 # read by api_as through ${!var}
+      GROUP_TOKEN=$(output_field group_access_tokens "bot_$group_id" token)
+      api_as GROUP_TOKEN "groups/$group_id" >/dev/null || fail "the group access token cannot read its group"
+      log "group access token reads its group"
+    fi
   fi
 
   tofu -chdir="$dir" output -json gitlab_runner_tokens | python3 -I -c '

@@ -64,7 +64,7 @@
 
 ### 4. Protected branches sent as access-level sets, checked on gitlab.com
 - On gitlab.com the module sends `allowed_to_push = [{ access_level = ... }]` and `allowed_to_merge = [{ access_level = ... }]`, the arguments the provider documents for EE instances, with `allow_force_push`, and `code_owner_approval_required` only when set (Premium).
-- The fixture's empty second plan decides. If gitlab.com Free rejects the sets, or reads them back differently, the module switches to `push_access_level` / `merge_access_level` in this change; the spec does not change, since it states who may push and merge, not the argument.
+- Settled by the owner-mode run on gitlab.com Free on 2026-10-23: the sets are accepted and read back unchanged (empty second plan), so no fallback. The fixture's empty second plan decides. If gitlab.com Free rejects the sets, or reads them back differently, the module switches to `push_access_level` / `merge_access_level` in this change; the spec does not change, since it states who may push and merge, not the argument.
 - Protected tags use `create_access_level`.
 - Defaults are computed in `locals.tf` when `protected_branches` is `null`: the default branch for maintainers, plus `develop` for developers when it is in `branches`. One protection resource per branch, because the provider takes over GitLab's own default-branch protection and two resources for one branch would fight.
 - Groups also send `default_branch_protection_defaults` (maintainers push and merge, no force push, no developer initial push), so projects created later by people in the group start protected too.

@@ -40,7 +40,7 @@ run "labels_badges_and_hooks_are_keyed_by_owner" {
             url                   = "https://ci.example.com/hook"
             merge_requests_events = true
             token                 = "dummy"
-            signing_token         = "dummy"
+            signing_token         = "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
           }
         }
       }
@@ -83,7 +83,7 @@ run "labels_badges_and_hooks_are_keyed_by_owner" {
     condition = alltrue([
       issensitive(gitlab_project_hook.this["platform/api:ci"].token),
       issensitive(gitlab_project_hook.this["platform/api:ci"].signing_token),
-      nonsensitive(gitlab_project_hook.this["platform/api:ci"].signing_token) == "dummy",
+      nonsensitive(gitlab_project_hook.this["platform/api:ci"].signing_token) == "whsec_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     ])
     error_message = "Hook token and signing_token must be redacted in plans."
   }
@@ -158,6 +158,18 @@ run "hook_url_without_scheme_is_rejected" {
 
   variables {
     projects = { "platform/api" = { hooks = { ci = { url = "ci.example.com/hook" } } } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "hook_signing_token_format_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = { hooks = { ci = { url = "https://ci.example.com/hook", signing_token = "s3cr3t" } } } }
   }
 
   expect_failures = [

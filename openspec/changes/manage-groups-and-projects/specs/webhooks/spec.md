@@ -18,8 +18,12 @@ Each `hooks` entry of a project SHALL create a webhook named by its key, keyed `
 - **THEN** the plan fails with "hooks[*].url must start with http:// or https://."
 
 ### Requirement: Hook security defaults
-A hook SHALL verify the endpoint's TLS certificate unless `enable_ssl_verification = false`, and its optional `token` and `signing_token` SHALL reach the provider as sensitive values, never shown in plan output.
+A hook SHALL verify the endpoint's TLS certificate unless `enable_ssl_verification = false`, and its optional `token` and `signing_token` SHALL reach the provider as sensitive values, never shown in plan output. `signing_token` SHALL be `whsec_` followed by the base64 of a 32-byte key, the only form GitLab accepts.
 
 #### Scenario: Signing token redacted
-- **WHEN** a hook sets `signing_token = "s3cr3t"` and the plan is rendered
+- **WHEN** a hook sets `signing_token = "whsec_<base64 of 32 bytes>"` and the plan is rendered
 - **THEN** the plan shows `signing_token = (sensitive value)`
+
+#### Scenario: Malformed signing token
+- **WHEN** a hook sets `signing_token = "s3cr3t"`
+- **THEN** the plan fails with "hooks[*].signing_token must be whsec_ followed by the base64 of a 32-byte key."

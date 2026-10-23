@@ -215,3 +215,15 @@ run "group_hook_url_without_scheme_is_rejected" {
     var.groups,
   ]
 }
+
+run "group_hook_signing_token_format_is_rejected" {
+  command = plan
+
+  variables {
+    groups = { platform = { hooks = { audit = { url = "https://audit.example.com/hook", signing_token = "s3cr3t" } } } }
+  }
+
+  expect_failures = [
+    var.groups,
+  ]
+}
