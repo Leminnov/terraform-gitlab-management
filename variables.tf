@@ -81,6 +81,11 @@ variable "group_variables" {
     ])
     error_message = "group_variables[*].key must match [A-Za-z_][A-Za-z0-9_]* (GitLab CI variable naming rule)."
   }
+
+  validation {
+    condition     = alltrue([for k in keys(var.group_variables) : !strcontains(k, ":")])
+    error_message = "group_variables keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
 }
 
 variable "project_variables" {
@@ -125,6 +130,11 @@ variable "project_variables" {
       length(v.key) > 0 && can(regex("^[A-Za-z_][A-Za-z0-9_]*$", v.key))
     ])
     error_message = "project_variables[*].key must match [A-Za-z_][A-Za-z0-9_]* (GitLab CI variable naming rule)."
+  }
+
+  validation {
+    condition     = alltrue([for k in keys(var.project_variables) : !strcontains(k, ":")])
+    error_message = "project_variables keys must not contain \":\" (reserved for objects nested in groups and projects)."
   }
 }
 
@@ -186,6 +196,11 @@ variable "deploy_tokens" {
     ])
     error_message = "deploy_tokens[*].name must be non-empty."
   }
+
+  validation {
+    condition     = alltrue([for k in keys(var.deploy_tokens) : !strcontains(k, ":")])
+    error_message = "deploy_tokens keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
 }
 
 variable "pipeline_schedules" {
@@ -231,6 +246,11 @@ variable "pipeline_schedules" {
       length(split(" ", trimspace(v.cron))) == 5
     ])
     error_message = "pipeline_schedules[*].cron must have exactly 5 whitespace-separated fields (minute hour day month weekday)."
+  }
+
+  validation {
+    condition     = alltrue([for k in keys(var.pipeline_schedules) : !strcontains(k, ":")])
+    error_message = "pipeline_schedules keys must not contain \":\" (reserved for objects nested in groups and projects)."
   }
 }
 
@@ -317,6 +337,11 @@ variable "gitlab_runners" {
     ])
     error_message = "gitlab_runners[*].maximum_timeout must be null or >= 600 (GitLab minimum)."
   }
+
+  validation {
+    condition     = alltrue([for k in keys(var.gitlab_runners) : !strcontains(k, ":")])
+    error_message = "gitlab_runners keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
 }
 
 variable "gitlab_group_access_token" {
@@ -368,6 +393,11 @@ variable "gitlab_group_access_token" {
       ]
     ]))
     error_message = "gitlab_group_access_token[*].scopes entries must be one of: ${join(", ", local.group_access_token_scopes)}."
+  }
+
+  validation {
+    condition     = alltrue([for k in keys(var.gitlab_group_access_token) : !strcontains(k, ":")])
+    error_message = "gitlab_group_access_token keys must not contain \":\" (reserved for objects nested in groups and projects)."
   }
 }
 
@@ -421,6 +451,11 @@ variable "gitlab_project_access_token" {
     ]))
     error_message = "gitlab_project_access_token[*].scopes entries must be one of: ${join(", ", local.project_access_token_scopes)}."
   }
+
+  validation {
+    condition     = alltrue([for k in keys(var.gitlab_project_access_token) : !strcontains(k, ":")])
+    error_message = "gitlab_project_access_token keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
 }
 
 # -----------------------------------------------------------------------------
@@ -451,6 +486,12 @@ variable "groups" {
       - require_two_factor_authentication : Require two-factor authentication for members; null keeps the GitLab default.
       - archive_on_destroy                : Archive the group instead of deleting it on destroy; default true.
       - permanently_remove_on_delete      : With archive_on_destroy = false, remove the group at once instead of scheduling the deletion; default false.
+      - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
+      - deploy_tokens : Deploy tokens keyed by name: username, expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
+      - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
+      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD).
+      - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD).
+      - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600).
   EOT
   type = map(object({
     name                              = optional(string)
@@ -463,6 +504,42 @@ variable "groups" {
     require_two_factor_authentication = optional(bool)
     archive_on_destroy                = optional(bool, true)
     permanently_remove_on_delete      = optional(bool, false)
+    variables = optional(map(object({
+      value         = string
+      variable_type = optional(string, "env_var")
+      protected     = optional(bool, false)
+      masked        = optional(bool, false)
+    })), {})
+    deploy_tokens = optional(map(object({
+      username   = optional(string)
+      expires_at = optional(string)
+      scopes     = list(string)
+    })), {})
+    access_tokens = optional(map(object({
+      expires_at   = string
+      access_level = optional(string)
+      scopes       = list(string)
+    })), {})
+    members = optional(map(object({
+      user_id      = number
+      access_level = string
+      expires_at   = optional(string)
+    })), {})
+    shared_with = optional(map(object({
+      group        = optional(string)
+      group_id     = optional(number)
+      access_level = string
+      expires_at   = optional(string)
+    })), {})
+    runners = optional(map(object({
+      description     = optional(string)
+      access_level    = optional(string, "ref_protected")
+      tag_list        = optional(list(string), [])
+      untagged        = optional(bool, false)
+      paused          = optional(bool, false)
+      locked          = optional(bool, false)
+      maximum_timeout = optional(number)
+    })), {})
   }))
   default = {}
 
@@ -525,6 +602,76 @@ variable "groups" {
     condition     = alltrue([for v in values(var.groups) : !(v.archive_on_destroy && v.permanently_remove_on_delete)])
     error_message = "groups[*].permanently_remove_on_delete requires archive_on_destroy = false."
   }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for k in keys(o.variables) : can(regex("^[A-Za-z_][A-Za-z0-9_]*$", k))]]))
+    error_message = "variables keys must match [A-Za-z_][A-Za-z0-9_]* (GitLab CI variable naming rule)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for v in values(o.variables) : contains(["env_var", "file"], v.variable_type)]]))
+    error_message = "variables[*].variable_type must be one of: env_var, file."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.deploy_tokens) : can(regex(local.rfc3339_regex, t.expires_at))]]))
+    error_message = "deploy_tokens[*].expires_at is required, as an RFC 3339 timestamp (for example 2027-06-30T00:00:00Z)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.deploy_tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.deploy_token_scopes, sc)])]]))
+    error_message = "deploy_tokens[*].scopes must be non-empty, each one of: ${join(", ", local.deploy_token_scopes)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : can(regex(local.day_regex, t.expires_at))]]))
+    error_message = "access_tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : t.access_level == null || contains(local.access_token_levels, t.access_level)]]))
+    error_message = "access_tokens[*].access_level must be one of: ${join(", ", local.access_token_levels)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.group_access_token_scopes, sc)])]]))
+    error_message = "access_tokens[*].scopes of group tokens must be non-empty, each one of: ${join(", ", local.group_access_token_scopes)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for m in values(o.members) : contains(local.access_token_levels, m.access_level)]]))
+    error_message = "members[*].access_level must be one of: ${join(", ", local.access_token_levels)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for m in values(o.members) : m.expires_at == null || can(regex(local.day_regex, m.expires_at))]]))
+    error_message = "members[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for sh in values(o.shared_with) : (sh.group == null) != (sh.group_id == null) && (sh.group == null || contains(keys(var.groups), coalesce(sh.group, "-")))]]))
+    error_message = "shared_with[*] must set exactly one of group (a groups key) or group_id."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for sh in values(o.shared_with) : contains(local.access_token_levels, sh.access_level) && (sh.expires_at == null || can(regex(local.day_regex, sh.expires_at)))]]))
+    error_message = "shared_with[*].access_level must be one of: ${join(", ", local.access_token_levels)}, and expires_at a YYYY-MM-DD date."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for r in values(o.runners) : contains(["not_protected", "ref_protected"], r.access_level)]]))
+    error_message = "runners[*].access_level must be one of: not_protected, ref_protected."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for r in values(o.runners) : r.untagged || length(r.tag_list) > 0]]))
+    error_message = "runners[*].tag_list must be non-empty unless untagged == true."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for r in values(o.runners) : r.maximum_timeout == null || coalesce(r.maximum_timeout, 0) >= 600]]))
+    error_message = "runners[*].maximum_timeout must be null or >= 600 (GitLab minimum)."
+  }
 }
 
 variable "projects" {
@@ -546,6 +693,17 @@ variable "projects" {
       - remove_source_branch_after_merge                 : Delete the source branch on merge by default; default true.
       - archive_on_destroy            : Archive the project instead of deleting it on destroy; default true.
       - permanently_delete_on_destroy : With archive_on_destroy = false, delete the project at once instead of scheduling the deletion; default false.
+      - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
+      - deploy_tokens : Deploy tokens keyed by name: username, expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
+      - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
+      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD).
+      - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD).
+      - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600).
+      - deploy_keys         : SSH deploy keys keyed by title: key (OpenSSH public key), expires_at (required, RFC 3339), can_push (default false).
+      - pipeline_schedules  : Schedules keyed by description: ref (full ref, default refs/heads/<default_branch>), cron (5 fields), active (default true), variables (redacted in plans).
+      - pipeline_triggers   : Set of pipeline trigger descriptions; their tokens are in the pipeline_trigger_tokens output.
+      - environments        : Environments keyed by name: tier (production, staging, testing, development, other), external_url, description.
+      - job_token_allowlist : When set, only the job tokens of this project and of the listed projects and groups (keys of projects / groups, or existing project_ids / group_ids) may access the project; null leaves GitLab's default.
   EOT
   type = map(object({
     name                   = optional(string)
@@ -572,6 +730,65 @@ variable "projects" {
     remove_source_branch_after_merge                 = optional(bool, true)
     archive_on_destroy                               = optional(bool, true)
     permanently_delete_on_destroy                    = optional(bool, false)
+    variables = optional(map(object({
+      value         = string
+      variable_type = optional(string, "env_var")
+      protected     = optional(bool, false)
+      masked        = optional(bool, false)
+    })), {})
+    deploy_tokens = optional(map(object({
+      username   = optional(string)
+      expires_at = optional(string)
+      scopes     = list(string)
+    })), {})
+    access_tokens = optional(map(object({
+      expires_at   = string
+      access_level = optional(string)
+      scopes       = list(string)
+    })), {})
+    members = optional(map(object({
+      user_id      = number
+      access_level = string
+      expires_at   = optional(string)
+    })), {})
+    shared_with = optional(map(object({
+      group        = optional(string)
+      group_id     = optional(number)
+      access_level = string
+      expires_at   = optional(string)
+    })), {})
+    runners = optional(map(object({
+      description     = optional(string)
+      access_level    = optional(string, "ref_protected")
+      tag_list        = optional(list(string), [])
+      untagged        = optional(bool, false)
+      paused          = optional(bool, false)
+      locked          = optional(bool, false)
+      maximum_timeout = optional(number)
+    })), {})
+    deploy_keys = optional(map(object({
+      key        = string
+      expires_at = optional(string)
+      can_push   = optional(bool, false)
+    })), {})
+    pipeline_schedules = optional(map(object({
+      ref       = optional(string)
+      cron      = string
+      active    = optional(bool, true)
+      variables = optional(map(string), {})
+    })), {})
+    pipeline_triggers = optional(set(string), [])
+    environments = optional(map(object({
+      tier         = optional(string)
+      external_url = optional(string)
+      description  = optional(string)
+    })), {})
+    job_token_allowlist = optional(object({
+      projects    = optional(set(string), [])
+      groups      = optional(set(string), [])
+      project_ids = optional(set(number), [])
+      group_ids   = optional(set(number), [])
+    }))
   }))
   default = {}
 
@@ -646,5 +863,114 @@ variable "projects" {
   validation {
     condition     = alltrue([for v in values(var.projects) : !(v.archive_on_destroy && v.permanently_delete_on_destroy)])
     error_message = "projects[*].permanently_delete_on_destroy requires archive_on_destroy = false."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for k in keys(o.variables) : can(regex("^[A-Za-z_][A-Za-z0-9_]*$", k))]]))
+    error_message = "variables keys must match [A-Za-z_][A-Za-z0-9_]* (GitLab CI variable naming rule)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for v in values(o.variables) : contains(["env_var", "file"], v.variable_type)]]))
+    error_message = "variables[*].variable_type must be one of: env_var, file."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.deploy_tokens) : can(regex(local.rfc3339_regex, t.expires_at))]]))
+    error_message = "deploy_tokens[*].expires_at is required, as an RFC 3339 timestamp (for example 2027-06-30T00:00:00Z)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.deploy_tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.deploy_token_scopes, sc)])]]))
+    error_message = "deploy_tokens[*].scopes must be non-empty, each one of: ${join(", ", local.deploy_token_scopes)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : can(regex(local.day_regex, t.expires_at))]]))
+    error_message = "access_tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : t.access_level == null || contains(local.access_token_levels, t.access_level)]]))
+    error_message = "access_tokens[*].access_level must be one of: ${join(", ", local.access_token_levels)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.project_access_token_scopes, sc)])]]))
+    error_message = "access_tokens[*].scopes of project tokens must be non-empty, each one of: ${join(", ", local.project_access_token_scopes)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for m in values(o.members) : contains(local.access_token_levels, m.access_level)]]))
+    error_message = "members[*].access_level must be one of: ${join(", ", local.access_token_levels)}."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for m in values(o.members) : m.expires_at == null || can(regex(local.day_regex, m.expires_at))]]))
+    error_message = "members[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for sh in values(o.shared_with) : (sh.group == null) != (sh.group_id == null) && (sh.group == null || contains(keys(var.groups), coalesce(sh.group, "-")))]]))
+    error_message = "shared_with[*] must set exactly one of group (a groups key) or group_id."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for sh in values(o.shared_with) : contains(local.access_token_levels, sh.access_level) && (sh.expires_at == null || can(regex(local.day_regex, sh.expires_at)))]]))
+    error_message = "shared_with[*].access_level must be one of: ${join(", ", local.access_token_levels)}, and expires_at a YYYY-MM-DD date."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.runners) : contains(["not_protected", "ref_protected"], r.access_level)]]))
+    error_message = "runners[*].access_level must be one of: not_protected, ref_protected."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.runners) : r.untagged || length(r.tag_list) > 0]]))
+    error_message = "runners[*].tag_list must be non-empty unless untagged == true."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.runners) : r.maximum_timeout == null || coalesce(r.maximum_timeout, 0) >= 600]]))
+    error_message = "runners[*].maximum_timeout must be null or >= 600 (GitLab minimum)."
+  }
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for d in values(o.deploy_keys) : can(regex("^(ssh-ed25519|ssh-rsa|ecdsa-sha2-[a-z0-9-]+|sk-[a-z0-9@.-]+) [A-Za-z0-9+/=]+", d.key))]]))
+    error_message = "deploy_keys[*].key must be an OpenSSH public key (ssh-ed25519, ssh-rsa, ecdsa-sha2-*, sk-*)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for d in values(o.deploy_keys) : can(regex(local.rfc3339_regex, d.expires_at))]]))
+    error_message = "deploy_keys[*].expires_at is required, as an RFC 3339 timestamp."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for sc in values(o.pipeline_schedules) : sc.ref == null || can(regex("^refs/(heads|tags)/.+", coalesce(sc.ref, "-")))]]))
+    error_message = "pipeline_schedules[*].ref must be a full git ref: refs/heads/<branch> or refs/tags/<tag>."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for sc in values(o.pipeline_schedules) : length(split(" ", trimspace(sc.cron))) == 5]]))
+    error_message = "pipeline_schedules[*].cron must have exactly 5 whitespace-separated fields (minute hour day month weekday)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for d in o.pipeline_triggers : trimspace(d) != ""]]))
+    error_message = "pipeline_triggers entries must be non-empty descriptions."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for e in values(o.environments) : e.tier == null || contains(["production", "staging", "testing", "development", "other"], coalesce(e.tier, "-"))]]))
+    error_message = "environments[*].tier must be one of: production, staging, testing, development, other."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for o in values(var.projects) : o.job_token_allowlist == null ? [true] : concat(
+        [for p in o.job_token_allowlist.projects : contains(keys(var.projects), p)],
+        [for g in o.job_token_allowlist.groups : contains(keys(var.groups), g)],
+      )
+    ]))
+    error_message = "job_token_allowlist projects and groups must be keys of projects and groups."
   }
 }

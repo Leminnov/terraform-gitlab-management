@@ -1,5 +1,6 @@
 # CI/CD objects: group and project variables, pipeline schedules and their
-# variables, runners.
+# variables, runners, and the environments, pipeline triggers and job token
+# allowlists of created projects.
 
 # DEVIATION(terraform-variables): the value input cannot be sensitive = true
 # because for_each iterates it, and the provider has no value_wo; sensitive()
@@ -30,7 +31,7 @@ resource "gitlab_project_variable" "this" {
 }
 
 resource "gitlab_pipeline_schedule" "this" {
-  for_each = var.pipeline_schedules
+  for_each = local.pipeline_schedules
 
   project     = each.value.project
   description = each.value.description
@@ -52,7 +53,7 @@ resource "gitlab_pipeline_schedule_variable" "this" {
 }
 
 resource "gitlab_user_runner" "this" {
-  for_each = var.gitlab_runners
+  for_each = local.runners
 
   runner_type     = each.value.runner_type
   description     = each.value.description
@@ -64,4 +65,32 @@ resource "gitlab_user_runner" "this" {
   paused          = each.value.paused
   untagged        = each.value.untagged
   locked          = each.value.locked
+}
+
+resource "gitlab_project_environment" "this" {
+  for_each = local.project_environments
+
+  project      = each.value.project
+  name         = each.value.name
+  tier         = each.value.tier
+  external_url = each.value.external_url
+  description  = each.value.description
+  # GitLab deletes only stopped environments; without this, destroy fails.
+  stop_before_destroy = true
+}
+
+resource "gitlab_pipeline_trigger" "this" {
+  for_each = local.pipeline_triggers
+
+  project     = each.value.project
+  description = each.value.description
+}
+
+resource "gitlab_project_job_token_scopes" "this" {
+  for_each = local.job_token_allowlists
+
+  project            = each.value.project
+  enabled            = true
+  target_project_ids = each.value.target_project_ids
+  target_group_ids   = each.value.target_group_ids
 }

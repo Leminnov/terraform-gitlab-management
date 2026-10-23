@@ -36,7 +36,7 @@ output "project_variables_ids" {
 }
 
 output "deploy_tokens" {
-  description = "Group deploy tokens keyed \"<entry>_<group>\": id, group, name, username, token, expires_at and scopes. Sensitive; username and token log in to the group's repositories and registries."
+  description = "Group deploy tokens keyed \"<entry>_<group>\" (deploy_tokens input) or \"<group key>:<name>\" (groups input): id, group, name, username, token, expires_at and scopes. Sensitive; username and token log in to the group's repositories and registries."
   value = {
     for k, v in gitlab_group_deploy_token.this : k => {
       id         = v.id
@@ -51,13 +51,35 @@ output "deploy_tokens" {
   sensitive = true
 }
 
+output "project_deploy_tokens" {
+  description = "Project deploy tokens keyed \"<project key>:<name>\": id, project, name, username, token, expires_at and scopes. Sensitive; username and token log in to the project's repository and registries."
+  value = {
+    for k, v in gitlab_project_deploy_token.this : k => {
+      id         = v.id
+      project    = v.project
+      name       = v.name
+      username   = v.username
+      token      = v.token
+      expires_at = v.expires_at
+      scopes     = v.scopes
+    }
+  }
+  sensitive = true
+}
+
 output "pipeline_schedule_ids" {
-  description = "GitLab pipeline schedule IDs keyed like the pipeline_schedules input"
+  description = "GitLab pipeline schedule IDs keyed like the pipeline_schedules input, or \"<project key>:<description>\" for created projects"
   value       = { for k, v in gitlab_pipeline_schedule.this : k => v.pipeline_schedule_id }
 }
 
+output "pipeline_trigger_tokens" {
+  description = "Pipeline trigger tokens keyed \"<project key>:<description>\", for triggering the project's pipelines through the API. Sensitive."
+  value       = { for k, v in gitlab_pipeline_trigger.this : k => v.token }
+  sensitive   = true
+}
+
 output "gitlab_runners" {
-  description = "Runners keyed like the gitlab_runners input: id (the GitLab runner ID), runner_type, description, group_id, project_id, access_level, tag_list, maximum_timeout, paused, untagged and locked"
+  description = "Runners keyed like the gitlab_runners input, or \"<owner key>:<name>\" for created groups and projects: id (the GitLab runner ID), runner_type, description, group_id, project_id, access_level, tag_list, maximum_timeout, paused, untagged and locked"
   value = {
     for k, v in gitlab_user_runner.this : k => {
       id              = v.id
@@ -76,13 +98,13 @@ output "gitlab_runners" {
 }
 
 output "gitlab_runner_tokens" {
-  description = "Runner authentication tokens (glrt-...) keyed like the gitlab_runners input, for registering the runner manager. Sensitive."
+  description = "Runner authentication tokens (glrt-...) keyed like the gitlab_runners output, for registering the runner manager. Sensitive."
   value       = { for k, v in gitlab_user_runner.this : k => v.token }
   sensitive   = true
 }
 
 output "group_access_tokens" {
-  description = "Group access tokens keyed \"<entry>_<group>\": id, group, name, token, expires_at, access_level and scopes. Sensitive."
+  description = "Group access tokens keyed \"<entry>_<group>\" (gitlab_group_access_token input) or \"<group key>:<name>\" (groups input): id, group, name, token, expires_at, access_level and scopes. Sensitive."
   value = {
     for k, v in gitlab_group_access_token.this : k => {
       id           = v.id
@@ -98,7 +120,7 @@ output "group_access_tokens" {
 }
 
 output "project_access_tokens" {
-  description = "Project access tokens keyed \"<entry>_<project>\": id, project, name, token, expires_at, access_level and scopes. Sensitive."
+  description = "Project access tokens keyed \"<entry>_<project>\" (gitlab_project_access_token input) or \"<project key>:<name>\" (projects input): id, project, name, token, expires_at, access_level and scopes. Sensitive."
   value = {
     for k, v in gitlab_project_access_token.this : k => {
       id           = v.id

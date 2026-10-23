@@ -59,9 +59,9 @@
 
 ## 4. Access and CI/CD objects nested in groups and projects (MR 3)
 
-- [ ] 4.1 The `:` rule on the seven standalone inputs. Verify one rejected-input run per input in `tests/main.tftest.hcl`, then `mise run test`.
-- [ ] 4.2 Nested collections merged into the existing resources: variables, group deploy tokens, group and project access tokens, pipeline schedules and their variables, runners. Their validations go on `groups` / `projects` with the messages from the specs. Verify `tofu validate`, and that the standalone runs in `tests/main.tftest.hcl` still pass unchanged.
-- [ ] 4.3 New resources:
+- [x] 4.1 The `:` rule on the seven standalone inputs. Verify one rejected-input run per input in `tests/main.tftest.hcl`, then `mise run test`.
+- [x] 4.2 Nested collections merged into the existing resources: variables, group deploy tokens, group and project access tokens, pipeline schedules and their variables, runners. Their validations go on `groups` / `projects` with the messages from the specs. Verify `tofu validate`, and that the standalone runs in `tests/main.tftest.hcl` still pass unchanged.
+- [x] 4.3 New resources:
   - project deploy tokens and output `project_deploy_tokens`;
   - deploy keys;
   - memberships and shares (group and project);
@@ -70,7 +70,7 @@
   - job token scopes;
 
   each with the spec validations. Nested values and hook tokens go through `sensitive()`. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 4.4 `tests/nested.tftest.hcl`:
+- [x] 4.4 `tests/nested.tftest.hcl`:
   - every nested collection's keys `"<owner>:<item>"`;
   - `issensitive()` on nested values;
   - the shared outputs holding standalone and nested keys;
@@ -78,7 +78,7 @@
   - `shared_with` and `job_token_allowlist` resolving created keys.
 
   Verify `mise run test` and the mutation check.
-- [ ] 4.5 `SECURITY.md`: rows for project deploy tokens, trigger tokens and nested secrets, and the rotation entries. `examples/complete`: a nested variable, a deploy token, a deploy key, an environment and a membership. CHANGELOG. Verify `pre-commit run -a`, and that the example plans without warnings.
+- [x] 4.5 `SECURITY.md`: rows for project deploy tokens, trigger tokens and nested secrets, and the rotation entries. `examples/complete`: a nested variable, a deploy token, a deploy key, an environment and a membership. CHANGELOG. Verify `pre-commit run -a`, and that the example plans without warnings.
 
 ## 5. Labels, badges and webhooks (MR 4)
 

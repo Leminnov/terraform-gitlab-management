@@ -18,6 +18,16 @@ variable "token_expires_at" {
   type        = string
 }
 
+variable "deploy_key" {
+  description = "OpenSSH public key (the .pub file) of the machine that clones platform/backend/api, for example a GitOps controller."
+  type        = string
+}
+
+variable "reviewer_user_id" {
+  description = "Numeric ID of the user given reporter access to platform/backend/api until token_expires_at."
+  type        = number
+}
+
 variable "registry_password" {
   description = "Value of the REGISTRY_PASSWORD group variable. Pass via TF_VAR_registry_password from your secret store; it lands in state (see SECURITY.md)."
   type        = string
@@ -37,8 +47,17 @@ module "gitlab_management" {
   }
 
   projects = {
-    "platform/docs"        = { description = "Platform documentation" }
-    "platform/backend/api" = { topics = ["api"] }
+    "platform/docs" = { description = "Platform documentation" }
+    "platform/backend/api" = {
+      topics = ["api"]
+
+      # Objects nested in a created project, keyed "platform/backend/api:<key>".
+      variables     = { LOG_LEVEL = { value = "info" } }
+      deploy_tokens = { pull = { expires_at = "${var.token_expires_at}T00:00:00Z", scopes = ["read_repository"] } }
+      deploy_keys   = { gitops = { key = var.deploy_key, expires_at = "${var.token_expires_at}T00:00:00Z" } }
+      environments  = { production = { tier = "production" } }
+      members       = { reviewer = { user_id = var.reviewer_user_id, access_level = "reporter", expires_at = var.token_expires_at } }
+    }
   }
 
   group_variables = {

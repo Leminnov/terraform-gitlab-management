@@ -1193,3 +1193,106 @@ run "clean_configuration_raises_no_warning" {
     }
   }
 }
+
+# ---------------------------------------------------------------------------
+# Standalone keys must not contain ":" (module-contract): they share resources
+# and outputs with the objects nested in groups and projects.
+# ---------------------------------------------------------------------------
+
+run "group_variables_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    group_variables = {
+      "bad:key" = { key = "K", groups = ["org/a"], value = "v" }
+    }
+  }
+
+  expect_failures = [
+    var.group_variables,
+  ]
+}
+
+run "project_variables_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    project_variables = {
+      "bad:key" = { key = "K", projects = ["org/app"], value = "v" }
+    }
+  }
+
+  expect_failures = [
+    var.project_variables,
+  ]
+}
+
+run "deploy_tokens_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    deploy_tokens = {
+      "bad:key" = { groups = ["org/a"], name = "registry", expires_at = timeadd(timestamp(), "720h"), scopes = ["read_registry"] }
+    }
+  }
+
+  expect_failures = [
+    var.deploy_tokens,
+  ]
+}
+
+run "pipeline_schedules_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    pipeline_schedules = {
+      "bad:key" = { project = "org/app", description = "nightly", ref = "refs/heads/main", cron = "0 2 * * *", active = true }
+    }
+  }
+
+  expect_failures = [
+    var.pipeline_schedules,
+  ]
+}
+
+run "gitlab_runners_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_runners = {
+      "bad:key" = { runner_type = "group_type", description = "ci", group_id = "123", access_level = "not_protected", tag_list = ["docker"], paused = false, untagged = false, locked = false }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_runners,
+  ]
+}
+
+run "gitlab_group_access_token_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_group_access_token = {
+      "bad:key" = { groups = ["org/a"], name = "bot", expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "720h")), access_level = "developer", scopes = ["read_api"] }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_group_access_token,
+  ]
+}
+
+run "gitlab_project_access_token_key_with_colon_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_project_access_token = {
+      "bad:key" = { projects = ["org/app"], name = "bot", expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "720h")), access_level = "developer", scopes = ["read_api"] }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_project_access_token,
+  ]
+}
