@@ -31,9 +31,9 @@ OpenTofu module that manages GitLab CI/CD settings across many groups and projec
 
 | Module | OpenTofu | Provider | GitLab | Examples applied |
 |--------|----------|----------|--------|------------------|
-| 13.0.0 (unreleased) | 1.11.14, 1.13.1 (validate and unit tests) | 19.5.0 | gitlab.com | Integration fixture not yet run against the sandbox |
+| 13.0.0 (unreleased) | 1.11.14, 1.13.2 (validate and unit tests) | 19.5.0 | gitlab.com | Integration fixture not yet run against the sandbox |
 
-CI validates every example and runs the unit suite on OpenTofu 1.11.14 and 1.13.1. `instance_type` runners need an instance administrator token and are covered by the unit suite only.
+CI validates every example and runs the unit suite on OpenTofu 1.11.14 and 1.13.2. `instance_type` runners need an instance administrator token and are covered by the unit suite only.
 
 ## Usage
 

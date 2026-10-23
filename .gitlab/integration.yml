@@ -5,7 +5,7 @@
 # release tags and the weekly schedule; merge requests rely on the unit suite.
 test:integration:gitlab:
   stage: test
-  image: alpine:3.22
+  image: alpine:3.24
   timeout: 30m
   needs: []
   # The sandbox is shared: one run at a time.

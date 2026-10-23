@@ -2,13 +2,13 @@
 
 ## 1. Toolchain to the latest stable releases (MR 1)
 
-- [ ] 1.1 `mise.toml` (design 1):
+- [x] 1.1 `mise.toml` (design 1):
   - `min_version = '2026.10.17'`;
   - opentofu 1.13.2, pre-commit 4.7.0, python 3.14.9, trivy 0.76.1, checkov 3.3.30, osv-scanner 2.7.0, node 24.22.1.
 
   Verify `mise install` succeeds and `mise ls --current` shows every pin.
-- [ ] 1.2 `.pre-commit-config.yaml`: pre-commit-terraform v1.109.3 with the `DEVIATION(terraform-repo-precommit)` comment. Verify `pre-commit run -a` passes twice in a row (the second run changes nothing).
-- [ ] 1.3 CI copies: `MISE_VERSION`, `TRIVY_VERSION` and `TOFU_VERSION` in `.gitlab/global.yml`; matrix `["1.11.14", "1.13.2"]` in `.gitlab/release.yml`; `alpine:3.24` in `release.yml` and `integration.yml`; `ubuntu:26.04` in `pre-commit.yml`. Verify every image tag with the registry manifest API, that each `*_VERSION` equals its `mise.toml` pin, and that the Renovate custom managers still match (the regex dry run from adopt-store-standards 1.8).
+- [x] 1.2 `.pre-commit-config.yaml`: pre-commit-terraform v1.109.3 with the `DEVIATION(terraform-repo-precommit)` comment. Verify `pre-commit run -a` passes twice in a row (the second run changes nothing).
+- [x] 1.3 CI copies: `MISE_VERSION`, `TRIVY_VERSION` and `TOFU_VERSION` in `.gitlab/global.yml`; matrix `["1.11.14", "1.13.2"]` in `.gitlab/release.yml`; `alpine:3.24` in `release.yml` and `integration.yml`; `ubuntu:26.04` in `pre-commit.yml`. Verify every image tag with the registry manifest API, that each `*_VERSION` equals its `mise.toml` pin, and that the Renovate custom managers still match (the regex dry run from adopt-store-standards 1.8).
 - [ ] 1.4 CHANGELOG `[Unreleased]` Changed entry for the toolchain. Verify `tofu fmt -check -recursive`, `tofu validate`, `mise run test`, `mise run scan` and `pre-commit run -a` pass, and that the MR 1 pipeline is green.
 
 ## 2. Group hierarchy and file layout (MR 2)

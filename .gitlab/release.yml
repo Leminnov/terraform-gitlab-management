@@ -8,7 +8,7 @@ validate:opentofu:
   # Minimum supported version and the mise.toml pin, exact tags (terraform-repo-mise).
   parallel:
     matrix:
-      - TOFU_IMAGE_VERSION: ["1.11.14", "1.13.1"]
+      - TOFU_IMAGE_VERSION: ["1.11.14", "1.13.2"]
   needs: []
   script:
     - tofu init -backend=false
@@ -26,7 +26,7 @@ validate:examples:
   # Same matrix as validate:opentofu.
   parallel:
     matrix:
-      - TOFU_IMAGE_VERSION: ["1.11.14", "1.13.1"]
+      - TOFU_IMAGE_VERSION: ["1.11.14", "1.13.2"]
   needs: []
   script:
     - |
@@ -111,7 +111,7 @@ security:gitleaks:
 # that meets both checks is accepted too.
 verify:changelog:
   stage: validate
-  image: alpine:3.22
+  image: alpine:3.24
   timeout: 5m
   needs: []
   rules:

@@ -20,11 +20,11 @@ variables:
   # job installs osv-scanner from mise.toml, so a CI variable would be unused.
   # Honoured by the https://mise.run installer; same as min_version in mise.toml.
   # renovate: datasource=github-releases depName=jdx/mise
-  MISE_VERSION: "v2026.9.14"
+  MISE_VERSION: "v2026.10.17"
   # renovate: datasource=docker depName=ghcr.io/terraform-linters/tflint
   TFLINT_VERSION: "v0.64.0"
   # renovate: datasource=docker depName=aquasec/trivy
-  TRIVY_VERSION: "0.74.0"
+  TRIVY_VERSION: "0.76.1"
   # renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
   GITLEAKS_VERSION: "v8.30.1"
   # renovate: datasource=docker depName=registry.gitlab.com/gitlab-org/release-cli
@@ -34,7 +34,7 @@ variables:
   OPENSPEC_VERSION: "1.14.3"
   # OpenTofu of the integration job (.gitlab/integration.yml), same as mise.toml.
   # renovate: datasource=github-releases depName=opentofu/opentofu extractVersion=^v(?<version>.+)$
-  TOFU_VERSION: "1.13.1"
+  TOFU_VERSION: "1.13.2"
 
 stages:
   - validate

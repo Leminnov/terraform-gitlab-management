@@ -26,7 +26,7 @@ mise run test     # tofu test
 - the redaction of CI variable and schedule variable values (`issensitive`);
 - one run per guardrail in `checks.tf` (`expect_failures = [check.<name>]`) and a clean configuration that raises none. Expiry dates are computed from `timestamp()` so the runs do not age.
 
-CI runs the suite in `validate:opentofu` on OpenTofu 1.11.14 and 1.13.1.
+CI runs the suite in `validate:opentofu` on OpenTofu 1.11.14 and 1.13.2.
 
 ## Integration tests
 

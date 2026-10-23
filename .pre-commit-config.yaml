@@ -36,8 +36,10 @@ repos:
     hooks:
       - id: gitleaks
 
+  # DEVIATION(terraform-repo-precommit): v1.109.3, the latest stable patch, above the
+  # store's v1.109.1 (maintainer decision: latest stable toolchain).
   - repo: https://github.com/antonbabenko/pre-commit-terraform.git
-    rev: v1.109.1
+    rev: v1.109.3
     hooks:
       # Pin the binary: with both tofu and terraform on PATH the hooks would
       # otherwise prefer terraform, which cannot reuse tofu-initialised dirs.

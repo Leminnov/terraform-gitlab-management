@@ -1,6 +1,8 @@
 pre-commit:
   stage: validate
-  image: ubuntu:24.04
+  # DEVIATION(repository-gitlab-ci): ubuntu:26.04, the current LTS, instead of the
+  # store's ubuntu:24.04 (maintainer decision: latest stable toolchain).
+  image: ubuntu:26.04
   timeout: 20m
   needs: []
   rules:
