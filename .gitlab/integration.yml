@@ -20,8 +20,9 @@ test:integration:gitlab:
         - .gitlab/integration.yml
         - .gitlab/global.yml
   before_script:
-    # coreutils: GNU date for the token expiry computed by run.sh.
-    - apk add --no-cache bash coreutils curl git python3 unzip
+    # coreutils: GNU date for the token expiry computed by run.sh;
+    # openssh-keygen: the deploy key of the owner run.
+    - apk add --no-cache bash coreutils curl git openssh-keygen python3 unzip
     - |
       set -eu
       cd /tmp

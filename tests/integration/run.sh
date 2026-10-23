@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 # Integration test of the module against a real GitLab (terraform-testing).
 #
-#   MODE=owner   tests/integration/run.sh   every resource type, owner token
+#   MODE=owner   tests/integration/run.sh   every resource type and a group and project tree, owner token
 #   MODE=least   tests/integration/run.sh   the Maintainer subset, least-privilege token
 #   MODE=upgrade tests/integration/run.sh   v12.0.0 state upgraded to this module
 #
 # Environment:
 #   GITLAB_TOKEN         token of the mode (owner, or Maintainer for MODE=least)
+#   GITLAB_TOKEN_LEAST   MODE=owner only: the Maintainer token, whose bot user joins the tree
 #   GITLAB_BASE_URL      API URL, default https://gitlab.com/api/v4/
 #   SANDBOX_GROUP_ID     numeric ID of the sandbox group
 #   SANDBOX_PROJECT_ID   numeric ID of a project in it, with a main branch
 #   RUN_SUFFIX           optional, default CI_PIPELINE_ID or the epoch
 #
 # owner/least: plan (the secret sentinel must not appear in the output), apply,
-# server-side assertions with the created tokens, empty second plan, destroy,
-# then the destroyed deploy token must be revoked. upgrade: apply v12.0.0 on
+# server-side assertions with the created tokens (and, for owner, on the tree:
+# paths, branches, protections, merge settings, deploy key, job token allowlist,
+# trigger token), empty second plan, destroy, then the destroyed deploy token
+# must be revoked. upgrade: apply v12.0.0 on
 # provider 18.11, plan this module on 19.5 and require the deploy token that
 # already had an expiry to be moved without replacement and the undated one to
 # be replaced once, apply, empty second plan, destroy. Everything is destroyed
@@ -97,7 +100,89 @@ second_plan_empty() {
   log "second plan empty"
 }
 
+# Owner mode: a deploy key generated for the run, and the user ID of the
+# least-privilege token's bot, added as a member of the tree's project.
+tree_inputs() {
+  : "${GITLAB_TOKEN_LEAST:?set GITLAB_TOKEN_LEAST: owner mode adds its bot user to the tree (TESTING.md)}"
+  ssh-keygen -q -t ed25519 -N '' -C "it-$suffix" -f "$work/deploy_key"
+  TF_VAR_deploy_key=$(cat "$work/deploy_key.pub")
+  TF_VAR_member_user_id=$(api_as GITLAB_TOKEN_LEAST personal_access_tokens/self | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["user_id"])')
+  export TF_VAR_deploy_key TF_VAR_member_user_id
+}
+
+check_tree() {
+  local tree=it-$suffix parent api_id tools_id
+  parent=$(api "groups/$group_id" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["full_path"])')
+  tofu -chdir="$dir" output -json groups >"$work/groups.json"
+  tofu -chdir="$dir" output -json projects >"$work/projects.json"
+  python3 -I -c '
+import json, sys
+work, parent, tree = sys.argv[1:]
+groups = json.load(open(work + "/groups.json"))
+projects = json.load(open(work + "/projects.json"))
+for key in (tree, tree + "/team", tree + "/team/svc"):
+    assert groups[key]["full_path"] == parent + "/" + key, "group path " + key
+for key in (tree + "/team/api", tree + "/tools"):
+    assert projects[key]["path_with_namespace"] == parent + "/" + key, "project path " + key
+    assert projects[key]["default_branch"] == "main", "default branch " + key' "$work" "$parent" "$tree" ||
+    fail "tree paths"
+  log "groups and projects have the expected full paths"
+
+  api_id=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]]["id"])' "$work/projects.json" "$tree/team/api")
+  tools_id=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]]["id"])' "$work/projects.json" "$tree/tools")
+  api "projects/$api_id" | python3 -I -c '
+import json, sys
+p = json.load(sys.stdin)
+want = {"default_branch": "main", "visibility": "private", "merge_method": "merge", "squash_option": "default_on",
+        "only_allow_merge_if_pipeline_succeeds": True, "only_allow_merge_if_all_discussions_are_resolved": True,
+        "remove_source_branch_after_merge": True}
+bad = {k: p.get(k) for k, v in want.items() if p.get(k) != v}
+assert not bad, "project settings: %s" % bad' || fail "project settings"
+  log "project settings follow gitlab-project-settings"
+
+  api "projects/$api_id/repository/branches/develop" >/dev/null || fail "develop branch missing"
+  api "projects/$api_id/protected_branches" | python3 -I -c '
+import json, sys
+got = {b["name"]: b for b in json.load(sys.stdin)}
+levels = lambda b, k: sorted(a["access_level"] for a in b[k])
+for name, level in (("main", 40), ("develop", 30)):
+    b = got[name]
+    assert levels(b, "push_access_levels") == [level] and levels(b, "merge_access_levels") == [level], "%s levels" % name
+    assert not b["allow_force_push"], "%s allows force push" % name' || fail "branch protections"
+  api "projects/$api_id/protected_tags" | python3 -I -c '
+import json, sys
+tags = {t["name"]: t for t in json.load(sys.stdin)}
+assert [a["access_level"] for a in tags["v*"]["create_access_levels"]] == [40], "v* tag protection"' ||
+    fail "tag protection"
+  log "main (maintainers), develop (developers) and v* tags are protected"
+
+  api "projects/$api_id/deploy_keys" | python3 -I -c '
+import json, sys
+keys = [k for k in json.load(sys.stdin) if k["title"] == "it"]
+assert keys and not keys[0]["can_push"], "deploy key"' || fail "deploy key"
+  log "read-only deploy key present"
+
+  api "projects/$api_id/job_token_scope" | python3 -I -c 'import json,sys; assert json.load(sys.stdin)["inbound_enabled"]' ||
+    fail "job token allowlist not enabled"
+  api "projects/$api_id/job_token_scope/allowlist" | python3 -I -c '
+import json, sys
+assert int(sys.argv[1]) in [p["id"] for p in json.load(sys.stdin)], "tools project not allowlisted"' "$tools_id" ||
+    fail "job token allowlist"
+  log "job token allowlist names the other project"
+
+  # A valid trigger token on a missing ref gets 400; an invalid one 404. No
+  # pipeline is created. The token is read from stdin, never from argv.
+  local code
+  code=$(tofu -chdir="$dir" output -json pipeline_trigger_tokens | python3 -I -c '
+import json, sys
+print("form = \"token=%s\"\nform = \"ref=it-no-such-ref\"" % json.load(sys.stdin)[sys.argv[1]])' "$tree/team/api:$tree" |
+    curl --config - -s -o /dev/null -w '%{http_code}' "$api_url/projects/$api_id/trigger/pipeline")
+  [ "$code" = 400 ] || fail "trigger token check (HTTP $code)"
+  log "pipeline trigger token authenticates"
+}
+
 run_apply_modes() {
+  [ "$mode" != owner ] || tree_inputs
   init
   plan_redacted -var "mode=$mode"
   log "plan redacts every secret value"
@@ -154,6 +239,8 @@ assert [v["key"] for v in s["variables"]] == ["IT_SCHEDULE_SECRET"], "schedule v
 import json, sys
 assert json.load(sys.stdin)["runner"].startswith("glrt-"), "runner token"' || fail "runner token check"
   log "runner token issued"
+
+  [ "$mode" != owner ] || check_tree
 
   second_plan_empty
 

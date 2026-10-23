@@ -34,8 +34,8 @@ CI runs the suite in `validate:opentofu` on OpenTofu 1.11.14 and 1.13.2.
 
 | Mode | Token | What it proves |
 |------|-------|----------------|
-| `owner` | `GITLAB_TOKEN` (Owner of the sandbox group) | Every resource type except `instance_type` runners: the plan output never contains the secret sentinel; GitLab holds the masked, protected group variable and the schedule variable; the deploy token clones the sandbox project; the project and group access tokens read their project and group; a `glrt-` runner token is issued; the second plan is empty; after destroy the deploy token no longer works |
-| `least` | `GITLAB_TOKEN_LEAST` (Maintainer of the sandbox group) | The same flow for what a Maintainer may create: no group access token, a project runner instead of a group runner |
+| `owner` | `GITLAB_TOKEN` (Owner of the sandbox group), and `GITLAB_TOKEN_LEAST` whose bot user joins the tree | Every resource type except `instance_type` runners and the Premium ones: the plan output never contains the secret sentinel (also used as a webhook signing token); GitLab holds the masked, protected group variable and the schedule variable; the deploy token clones the sandbox project; the project and group access tokens read their project and group; a `glrt-` runner token is issued. A tree `it-<suffix>`, `it-<suffix>/team`, `it-<suffix>/team/svc` with the projects `team/api` and `tools` gets the expected full paths, `main` and `develop` protected for maintainers and developers, `v*` tags protected, the merge settings, a read-only deploy key (generated with `ssh-keygen`), a job token allowlist naming `tools` and a trigger token that authenticates. The second plan is empty; destroy removes the tree for good, and the deploy token no longer works |
+| `least` | `GITLAB_TOKEN_LEAST` (Maintainer of the sandbox group) | The same flow for what a Maintainer may create: no group access token, a project runner instead of a group runner, no tree (subgroups need the Owner role) |
 | `upgrade` | `GITLAB_TOKEN` | State written by `v12.0.0` on provider 18.11 is planned with this module on 19.5: the deploy token that already had an expiry is moved to `gitlab_group_deploy_token` without replacement, the undated one is replaced once, nothing else is destroyed; then apply and an empty second plan |
 
 Every mode destroys what it created on exit, also on failure. Names and keys carry a run suffix (`RUN_SUFFIX`, the CI pipeline ID or the epoch); if a run is killed before its cleanup, delete the leftovers suffixed accordingly.
@@ -61,4 +61,4 @@ GITLAB_TOKEN_LEAST="$(bao kv get -field=maintainer kv/gitlab/sandbox)" \
   mise run test-integration
 ```
 
-`MODE=owner|least|upgrade tests/integration/run.sh` runs a single mode with `GITLAB_TOKEN` set to the matching token. Set `GITLAB_BASE_URL` to test a self-managed GitLab.
+`MODE=owner|least|upgrade tests/integration/run.sh` runs a single mode with `GITLAB_TOKEN` set to the matching token; `MODE=owner` also needs `GITLAB_TOKEN_LEAST` and `ssh-keygen`. Set `GITLAB_BASE_URL` to test a self-managed GitLab.

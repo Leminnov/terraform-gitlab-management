@@ -100,7 +100,7 @@
   - `SANDBOX_GROUP_ID` and `SANDBOX_PROJECT_ID`.
 
   Verify read-only with `glab api projects/:id/variables` that the four keys exist, protected and masked where secret.
-- [ ] 7.2 Extend `tests/integration/main.tf` and `run.sh` `MODE=owner` with the tree of design 11 (generated deploy key, member ID from the least-privilege token, permanent-removal flags) and its API assertions. Verify `bash -n`, shellcheck, and a mock-provider plan of the fixture in both modes without warnings.
+- [x] 7.2 Extend `tests/integration/main.tf` and `run.sh` `MODE=owner` with the tree of design 11 (generated deploy key, member ID from the least-privilege token, permanent-removal flags) and its API assertions. Verify `bash -n`, shellcheck, and a mock-provider plan of the fixture in both modes without warnings.
 - [ ] 7.3 Run `mise run test-integration` against the sandbox with the maintainer's tokens passed per command, only when the user asks (carried 7.3). All three modes pass. Fold any read-back finding into the code, its test and its spec in this change, including the protected-branch argument choice of design 4.
 - [ ] 7.4 After MR 5 merges, the `develop` pipeline runs `test:integration:gitlab` green (carried 7.4).
 - [ ] 7.5 Docs from the run (carried 7.5), checked by running the documented commands:
