@@ -35,7 +35,7 @@ CI runs the suite in `validate:opentofu` on OpenTofu 1.11.14 and 1.13.2.
 | Mode | Token | What it proves |
 |------|-------|----------------|
 | `owner` | `GITLAB_TOKEN` (Owner of the sandbox group) | Every resource type except `instance_type` runners and the Premium ones: the plan output never contains the secret sentinel (also used as a webhook signing token); GitLab holds the masked, protected group variable and the schedule variable; the deploy token clones the sandbox project; the project and group access tokens read their project and group (skipped on a gitlab.com Free namespace, where they need Premium); a `glrt-` runner token is issued. A tree `it-<suffix>`, `it-<suffix>/team`, `it-<suffix>/team/svc` with the projects `team/api` and `tools` (the token's own user as a direct member) gets the expected full paths, `main` and `develop` protected for maintainers and developers, `v*` tags protected, the merge settings, a read-only deploy key (generated with `ssh-keygen`), a job token allowlist naming `tools` and a trigger token that authenticates. The second plan is empty; destroy removes the tree for good, and the deploy token no longer works |
-| `least` | `GITLAB_TOKEN_LEAST` (Maintainer of the sandbox group) | The same flow for what a Maintainer may create: no group access token, a project runner instead of a group runner, no tree (subgroups need the Owner role) |
+| `least` | `GITLAB_TOKEN_LEAST` (Maintainer of the sandbox group); skipped by `mise run test-integration` and CI when unset | The same flow for what a Maintainer may create: no group access token, a project runner instead of a group runner, no tree (subgroups need the Owner role) |
 | `upgrade` | `GITLAB_TOKEN` | State written by `v12.0.0` on provider 18.11 is planned with this module on 19.5: the deploy token that already had an expiry is moved to `gitlab_group_deploy_token` without replacement, the undated one is replaced once, nothing else is destroyed; then apply and an empty second plan |
 
 Every mode destroys what it created on exit, also on failure. Names and keys carry a run suffix (`RUN_SUFFIX`, the CI pipeline ID or the epoch); if a run is killed before its cleanup, delete the leftovers suffixed accordingly.
@@ -47,6 +47,8 @@ A maintainer prepares it once:
 1. A group dedicated to the tests (for example `leminnov/sandbox/terraform-gitlab-management`) and a project in it with a `main` branch.
 2. Two tokens with scope `api`, expiring within one year: one for an Owner of the group (also `create_runner`), one for a Maintainer. On self-managed GitLab or a Premium gitlab.com group, use two group access tokens. On a Free gitlab.com group, where access tokens need Premium, use the personal access tokens of two dedicated accounts; `run.sh` then skips the access-token resources.
 3. In the project's CI/CD settings, four variables, all protected: `GITLAB_TOKEN` and `GITLAB_TOKEN_LEAST` (masked and hidden), `SANDBOX_GROUP_ID` and `SANDBOX_PROJECT_ID` (the numeric IDs).
+
+The project uses the `leminnov/test` group (ID 145539486) and its project `leminnov/test/sandbox` (ID 87995031). `GITLAB_TOKEN_LEAST` is not set yet: a Free group has no Maintainer access token, so the least run waits for a second account.
 
 Because the variables are protected, `test:integration:gitlab` runs on `main`, `develop`, release tags and the weekly schedule, not on merge requests from feature branches, and `create:release` waits for it.
 

@@ -93,13 +93,16 @@ if [ "$rc" -ne 0 ] && [ "$rc" -ne 128 ]; then exit "$rc"; fi
 # Needs the sandbox group and project and their two tokens (TESTING.md); pass
 # the tokens for the command only, from your secret store.
 [tasks.test-integration]
-description = "Integration tests against the GitLab sandbox: owner, least privilege, and upgrade from v12.0.0 (see TESTING.md)"
+description = "Integration tests against the GitLab sandbox: owner, least privilege (when GITLAB_TOKEN_LEAST is set), and upgrade from v12.0.0 (see TESTING.md)"
 run = '''
 set -eu
 : "${GITLAB_TOKEN:?set GITLAB_TOKEN to the sandbox owner token (TESTING.md)}"
-: "${GITLAB_TOKEN_LEAST:?set GITLAB_TOKEN_LEAST to the sandbox Maintainer token (TESTING.md)}"
 : "${SANDBOX_GROUP_ID:?set SANDBOX_GROUP_ID}" "${SANDBOX_PROJECT_ID:?set SANDBOX_PROJECT_ID}"
 MODE=owner tests/integration/run.sh
-GITLAB_TOKEN="$GITLAB_TOKEN_LEAST" MODE=least tests/integration/run.sh
+if [ -n "${GITLAB_TOKEN_LEAST:-}" ]; then
+  GITLAB_TOKEN="$GITLAB_TOKEN_LEAST" MODE=least tests/integration/run.sh
+else
+  echo "integration[least]: SKIPPED, GITLAB_TOKEN_LEAST is not set (TESTING.md)"
+fi
 MODE=upgrade tests/integration/run.sh
 '''

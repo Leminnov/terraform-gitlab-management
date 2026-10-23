@@ -3,6 +3,9 @@
 # server-side, requiring an empty second plan and destroying. The tokens are
 # protected, masked CI variables, so the job only runs on protected branches,
 # release tags and the weekly schedule; merge requests rely on the unit suite.
+# The least-privilege run needs GITLAB_TOKEN_LEAST, a Maintainer token, which a
+# gitlab.com Free sandbox can only get from a second account: without it the
+# job runs owner and upgrade and says the least run was skipped.
 test:integration:gitlab:
   stage: test
   image: alpine:3.24
@@ -11,7 +14,7 @@ test:integration:gitlab:
   # The sandbox is shared: one run at a time.
   resource_group: gitlab-sandbox
   rules:
-    - if: $GITLAB_TOKEN == null || $GITLAB_TOKEN_LEAST == null || $SANDBOX_GROUP_ID == null || $SANDBOX_PROJECT_ID == null
+    - if: $GITLAB_TOKEN == null || $SANDBOX_GROUP_ID == null || $SANDBOX_PROJECT_ID == null
       when: never
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ || $CI_PIPELINE_SOURCE == "schedule"
     - changes:
@@ -34,5 +37,10 @@ test:integration:gitlab:
     - tofu version
   script:
     - MODE=owner tests/integration/run.sh
-    - GITLAB_TOKEN="$GITLAB_TOKEN_LEAST" MODE=least tests/integration/run.sh
+    - |
+      if [ -n "${GITLAB_TOKEN_LEAST:-}" ]; then
+        GITLAB_TOKEN="$GITLAB_TOKEN_LEAST" MODE=least tests/integration/run.sh
+      else
+        echo "integration[least]: SKIPPED, GITLAB_TOKEN_LEAST is not set (TESTING.md)"
+      fi
     - MODE=upgrade tests/integration/run.sh

@@ -31,6 +31,12 @@ variable "suffix" {
   type        = string
 }
 
+variable "access_tokens" {
+  description = "Create the project access token; run.sh sets false on a gitlab.com Free namespace, where access tokens need Premium."
+  type        = bool
+  default     = true
+}
+
 variable "expires_on" {
   description = "Token expiry date, YYYY-MM-DD."
   type        = string
@@ -75,12 +81,14 @@ module "gitlab_management" {
   }
 
   gitlab_project_access_token = {
-    bot = {
-      projects     = [var.project_id]
-      name         = "it-upgrade-${var.suffix}"
-      expires_at   = var.expires_on
-      access_level = "reporter"
-      scopes       = ["read_api"]
-    }
+    for k, v in {
+      bot = {
+        projects     = [var.project_id]
+        name         = "it-upgrade-${var.suffix}"
+        expires_at   = var.expires_on
+        access_level = "reporter"
+        scopes       = ["read_api"]
+      }
+    } : k => v if var.access_tokens
   }
 }

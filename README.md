@@ -36,7 +36,7 @@ Creating groups under `parent_group_id` needs the Owner role on it; the token al
 
 | Module | OpenTofu | Provider | GitLab | Examples applied |
 |--------|----------|----------|--------|------------------|
-| 13.0.0 (unreleased) | 1.11.14, 1.13.2 (validate and unit tests); 1.13.2 (integration) | 19.5.0 | gitlab.com (Free) | Integration fixture `MODE=owner` applied 2026-10-23: three-level tree, nested objects and standalone resources, empty second plan; access tokens skipped (Premium on gitlab.com); `least` and `upgrade` not yet run; Premium settings untested |
+| 13.0.0 (unreleased) | 1.11.14, 1.13.2 (validate and unit tests); 1.13.2 (integration) | 19.5.0 | gitlab.com (Free) | Integration fixture applied 2026-10-23: `owner` (three-level tree, nested objects and standalone resources, empty second plan) and `upgrade` from v12.0.0 (deploy tokens moved, empty second plan); access tokens skipped (Premium on gitlab.com); `least` not yet run; Premium settings untested |
 
 CI validates every example and runs the unit suite on OpenTofu 1.11.14 and 1.13.2. `instance_type` runners need an instance administrator token and are covered by the unit suite only.
 
