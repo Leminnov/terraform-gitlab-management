@@ -13,8 +13,8 @@
 
 ## 2. Group hierarchy and file layout (MR 2)
 
-- [ ] 2.1 Move the existing resources into themed files (`access.tf`, `ci.tf`) and leave `main.tf` with the header index (design 9). Verify `tofu validate`, `mise run test` (50 runs), and that `tofu state list` addresses are unchanged: plan the unit fixtures before and after and compare the planned addresses.
-- [ ] 2.2 `variables.tf`: `parent_group_id` and the `groups` object (settings, defaults and nested collection shapes from the specs), with one validation per `groups` spec rule:
+- [x] 2.1 Move the existing resources into themed files (`access.tf`, `ci.tf`) and leave `main.tf` with the header index (design 9). Verify `tofu validate`, `mise run test` (50 runs), and that `tofu state list` addresses are unchanged: plan the unit fixtures before and after and compare the planned addresses.
+- [x] 2.2 `variables.tf`: `parent_group_id` and the `groups` object (settings, defaults and nested collection shapes from the specs), with one validation per `groups` spec rule:
   - parent required;
   - segments and path format;
   - parent declared;
@@ -22,8 +22,8 @@
   - creation levels.
 
   Verify `tofu validate`.
-- [ ] 2.3 `groups.tf`: `gitlab_group.level_1` to `level_7` from `local.group_args` and `local.groups_by_level`, with `default_branch_protection_defaults`, `archive_on_destroy` and `permanently_remove_on_delete`. `locals.tf`: `group_ids`. `outputs.tf`: `groups`. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 2.4 `tests/groups.tftest.hcl` with mock IDs:
+- [x] 2.3 `groups.tf`: `gitlab_group.level_1` to `level_7` from `local.group_args` and `local.groups_by_level`, with `default_branch_protection_defaults`, `archive_on_destroy` and `permanently_remove_on_delete`. `locals.tf`: `group_ids`. `outputs.tf`: `groups`. Verify `tofu validate` and `tflint --recursive`.
+- [x] 2.4 `tests/groups.tftest.hcl` with mock IDs:
   - one run per level 1 to 7, asserting the address `gitlab_group.level_<n>["<key>"]` and its parent;
   - several roots;
   - name defaulted;
@@ -35,7 +35,7 @@
 
 ## 3. Projects and repository protection (MR 2)
 
-- [ ] 3.1 `variables.tf`: the `projects` object, with one validation per `projects` and `repository-protection` spec rule:
+- [x] 3.1 `variables.tf`: the `projects` object, with one validation per `projects` and `repository-protection` spec rule:
   - path and namespace;
   - visibility values and nesting;
   - merge method;
@@ -44,8 +44,8 @@
   - protected-branch and tag access levels.
 
   Verify `tofu validate`.
-- [ ] 3.2 `projects.tf`: `gitlab_project.this` (namespace from `local.project_namespace_ids`, merge settings, archive flags), `gitlab_branch.this`, `gitlab_branch_protection.this` (access-level sets per design 4, defaults from `locals.tf` when `protected_branches` is null) and `gitlab_tag_protection.this`. `outputs.tf`: `projects`. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 3.3 `tests/projects.tftest.hcl`:
+- [x] 3.2 `projects.tf`: `gitlab_project.this` (namespace from `local.project_namespace_ids`, merge settings, archive flags), `gitlab_branch.this`, `gitlab_branch_protection.this` (access-level sets per design 4, defaults from `locals.tf` when `protected_branches` is null) and `gitlab_tag_protection.this`. `outputs.tf`: `projects`. Verify `tofu validate` and `tflint --recursive`.
+- [x] 3.3 `tests/projects.tftest.hcl`:
   - namespace under a created group and under the parent;
   - every default from the specs (private, `main`, README, `develop`, protections for `main` and `develop`, `v*`, merge settings);
   - `protected_branches` replacing the defaults;
@@ -55,7 +55,7 @@
   - `projects` output keys.
 
   Verify `mise run test` and the mutation check.
-- [ ] 3.4 `examples/complete`: a tree of two levels with a project per level, using the defaults. Example README updated (Owner role on the parent group). CHANGELOG Added entries. README Features and Usage. Verify `tofu validate` in the example, that it plans without warnings under a mock (adopt-store-standards 6.3 method), and `pre-commit run -a`.
+- [x] 3.4 `examples/complete`: a tree of two levels with a project per level, using the defaults. Example README updated (Owner role on the parent group). CHANGELOG Added entries. README Features and Usage. Verify `tofu validate` in the example, that it plans without warnings under a mock (adopt-store-standards 6.3 method), and `pre-commit run -a`.
 
 ## 4. Access and CI/CD objects nested in groups and projects (MR 3)
 

@@ -71,4 +71,7 @@ The state of a root module calling this module holds every value listed above. R
 
 - Tool versions (OpenTofu, tflint, terraform-docs, pre-commit, gitleaks, trivy, checkov, osv-scanner, git-cliff, openspec) are pinned in `mise.toml`, and the CI images in `.gitlab/` carry the same versions. Renovate (`renovate.json`) bumps a pin and its CI copies in one "toolchain" merge request.
 - Every pipeline runs pre-commit (fmt, docs, tflint, validate, checkov, trivy, gitleaks on staged files), `osv-scanner`, `security:trivy` (misconfigurations, secrets and vulnerable dependencies) and the unit tests; merge requests also run `security:gitleaks` over their commits, and the weekly schedule runs it over the full history.
+- Checkov findings suppressed inline, each with its reason next to the rule id (`projects.tf`):
+  - `CKV_GLB_1` (required approvals), `CKV_GLB_3` (push rule `prevent_secrets`), `CKV_GLB_4` (signed-commit push rule): Premium features, which a Free namespace cannot enable. Premium namespaces set `approval_rules` and `push_rules`.
+  - `CKV_GLB_2` (no force push): `allow_force_push` defaults to `false`, checkov cannot resolve the per-branch input, and `check.protected_branch_force_push` warns when a caller enables it.
 - A release is a signed `vX.Y.Z` tag on `main`; its pipeline publishes a CycloneDX SBOM to the project's package registry, linked from the release, and `create:release` waits for every validation and scanning job.

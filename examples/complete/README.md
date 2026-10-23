@@ -4,6 +4,7 @@ Exercises every input of the module with settings that raise no guardrail warnin
 
 ## What this example does
 
+- Creates the groups `platform` and `platform/backend` under the demo group, and the projects `platform/docs` and `platform/backend/api`, with the module defaults: private, `main` initialised and protected for maintainers, `develop` created and protected for developers, `v*` tags protected, merges only on a green pipeline with threads resolved.
 - Creates 2 group variables (`PIPELINE_LOG_LEVEL`, and `REGISTRY_PASSWORD` masked and protected) and 1 file-type project variable.
 - Creates 1 group deploy token (`read_repository`, `read_registry`).
 - Creates 1 pipeline schedule on `refs/heads/main` with 1 schedule variable.
@@ -13,7 +14,7 @@ Exercises every input of the module with settings that raise no guardrail warnin
 ## Prerequisites
 
 - OpenTofu >= 1.11.
-- A group you own (group runners and group access tokens need the Owner role) and a project in it, on gitlab.com or a self-managed GitLab.
+- A group you own (subgroups, group runners and group access tokens need the Owner role) and a project in it, on gitlab.com or a self-managed GitLab.
 - A token with the `api` scope (and `create_runner` for the runner) for that group, kept in your secret store.
 - The value of `REGISTRY_PASSWORD` in your secret store; it lands in state, like every token this example creates ([SECURITY.md](../../SECURITY.md)).
 
@@ -41,6 +42,8 @@ TF_VAR_registry_password="$(bao kv get -field=password kv/registry/ci)" \
 - `deploy_tokens`, `gitlab_runner_tokens`: sensitive; read them with `tofu output -json <name>` and store them straight in the system that consumes them.
 
 ## Cleanup
+
+The created groups and projects are archived, not deleted, on destroy (the module's safe default), so their paths stay taken; delete them in the GitLab UI afterwards, or set `archive_on_destroy = false` on each entry before destroying a throwaway tree.
 
 ```sh
 GITLAB_TOKEN="$(bao kv get -field=token kv/gitlab/terraform)" \

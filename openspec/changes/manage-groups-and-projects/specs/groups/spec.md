@@ -83,6 +83,10 @@ A group SHALL be archived instead of deleted when the module destroys it, unless
 - **WHEN** the integration fixture sets `archive_on_destroy = false` and `permanently_remove_on_delete = true`
 - **THEN** destroy removes the group for good
 
+#### Scenario: Permanent removal while archiving
+- **WHEN** an entry sets `permanently_remove_on_delete = true` and keeps `archive_on_destroy = true`
+- **THEN** the plan fails with "groups[*].permanently_remove_on_delete requires archive_on_destroy = false."
+
 ### Requirement: Group outputs
 The output `groups` SHALL map each `groups` key to its `id`, `full_path` and `web_url`.
 

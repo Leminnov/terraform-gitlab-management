@@ -22,6 +22,10 @@ locals {
   # 8784h = 366 days: one year (secrets-rotation) plus date granularity.
   long_lived_tokens = sort([for k, expiry in local.token_expiries : k if timecmp(expiry, timeadd(plantimestamp(), "8784h")) > 0])
 
+  protected_branches_with_force_push = sort([
+    for b in values(local.project_protected_branches) : "projects[\"${b.project}\"].protected_branches[\"${b.branch}\"]" if b.allow_force_push
+  ])
+
   # GitLab grants maintainer when access_level is unset.
   privileged_access_tokens = sort(concat(
     [for k, v in local.group_access_tokens : "gitlab_group_access_token[\"${k}\"]" if v.access_level == null || v.access_level == "owner"],
@@ -47,5 +51,12 @@ check "access_token_privilege" {
   assert {
     condition     = length(local.privileged_access_tokens) == 0
     error_message = "Access tokens with access_level owner, or unset so that GitLab grants maintainer: ${join(", ", local.privileged_access_tokens)}. Set the lowest access_level that works."
+  }
+}
+
+check "protected_branch_force_push" {
+  assert {
+    condition     = length(local.protected_branches_with_force_push) == 0
+    error_message = "Protected branches allowing force push: ${join(", ", local.protected_branches_with_force_push)}. Set allow_force_push = false; history on shared branches is never rewritten (git-history)."
   }
 }

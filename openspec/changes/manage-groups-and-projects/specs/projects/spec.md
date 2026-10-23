@@ -61,6 +61,10 @@ A project SHALL be archived instead of deleted when the module destroys it, unle
 - **WHEN** an entry without `archive_on_destroy` is removed from `projects`
 - **THEN** the project is archived on GitLab with its repository intact
 
+#### Scenario: Permanent deletion while archiving
+- **WHEN** an entry sets `permanently_delete_on_destroy = true` and keeps `archive_on_destroy = true`
+- **THEN** the plan fails with "projects[*].permanently_delete_on_destroy requires archive_on_destroy = false."
+
 ### Requirement: Project outputs
 The output `projects` SHALL map each `projects` key to its `id`, `path_with_namespace`, `web_url`, `http_url_to_repo`, `ssh_url_to_repo` and `default_branch`.
 

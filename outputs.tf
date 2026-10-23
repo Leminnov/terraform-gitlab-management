@@ -6,6 +6,25 @@
 # their input, to avoid renaming outputs that consumers read; input renames are
 # out of scope of this release.
 
+output "groups" {
+  description = "Created groups keyed like the groups input (path relative to parent_group_id): id, full_path and web_url"
+  value       = local.created_groups
+}
+
+output "projects" {
+  description = "Created projects keyed like the projects input (path relative to parent_group_id): id, path_with_namespace, web_url, http_url_to_repo, ssh_url_to_repo and default_branch"
+  value = {
+    for k, p in gitlab_project.this : k => {
+      id                  = p.id
+      path_with_namespace = p.path_with_namespace
+      web_url             = p.web_url
+      http_url_to_repo    = p.http_url_to_repo
+      ssh_url_to_repo     = p.ssh_url_to_repo
+      default_branch      = p.default_branch
+    }
+  }
+}
+
 output "group_variables_ids" {
   description = "IDs of the group CI/CD variables, in the form <group>:<key>:<environment_scope>"
   value       = [for k, v in gitlab_group_variable.this : v.id]

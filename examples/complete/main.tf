@@ -27,6 +27,20 @@ variable "registry_password" {
 module "gitlab_management" {
   source = "../.."
 
+  # A two-level tree under the demo group, with the module defaults: private,
+  # main + develop protected, v* tags protected, merge on green pipelines.
+  parent_group_id = tonumber(var.demo_group_id)
+
+  groups = {
+    platform           = { description = "Platform team" }
+    "platform/backend" = {}
+  }
+
+  projects = {
+    "platform/docs"        = { description = "Platform documentation" }
+    "platform/backend/api" = { topics = ["api"] }
+  }
+
   group_variables = {
     pipeline_log_level = {
       key    = "PIPELINE_LOG_LEVEL"
