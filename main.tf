@@ -12,4 +12,6 @@
 #               gitlab_pipeline_schedule, gitlab_pipeline_schedule_variable,
 #               gitlab_user_runner, gitlab_project_environment,
 #               gitlab_pipeline_trigger, gitlab_project_job_token_scopes
+#   metadata.tf gitlab_group_label, gitlab_project_label, gitlab_group_badge,
+#               gitlab_project_badge, gitlab_project_hook
 #   checks.tf   plan-time guardrails (check blocks)

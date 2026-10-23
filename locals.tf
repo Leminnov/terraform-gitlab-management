@@ -251,6 +251,36 @@ locals {
     } if pr.job_token_allowlist != null
   }
 
+  group_labels = merge([
+    for gk, g in var.groups : {
+      for name, l in g.labels : "${gk}:${name}" => merge(l, { group = local.group_ids[gk], name = name })
+    }
+  ]...)
+
+  project_labels = merge([
+    for pk, pr in var.projects : {
+      for name, l in pr.labels : "${pk}:${name}" => merge(l, { project = local.project_ids[pk], name = name })
+    }
+  ]...)
+
+  group_badges = merge([
+    for gk, g in var.groups : {
+      for name, b in g.badges : "${gk}:${name}" => merge(b, { group = local.group_ids[gk], name = name })
+    }
+  ]...)
+
+  project_badges = merge([
+    for pk, pr in var.projects : {
+      for name, b in pr.badges : "${pk}:${name}" => merge(b, { project = local.project_ids[pk], name = name })
+    }
+  ]...)
+
+  project_hooks = merge([
+    for pk, pr in var.projects : {
+      for name, h in pr.hooks : "${pk}:${name}" => merge(h, { project = local.project_ids[pk], name = name })
+    }
+  ]...)
+
   project_branches = merge([
     for pk, v in var.projects : {
       for name, b in v.branches : "${pk}:${name}" => {

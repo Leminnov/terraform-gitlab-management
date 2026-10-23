@@ -42,7 +42,16 @@ module "gitlab_management" {
   parent_group_id = tonumber(var.demo_group_id)
 
   groups = {
-    platform           = { description = "Platform team" }
+    platform = {
+      description = "Platform team"
+      labels      = { bug = { color = "#d9534f" } }
+      badges = {
+        pipeline = {
+          link_url  = "https://gitlab.com/%%{project_path}/-/pipelines"
+          image_url = "https://gitlab.com/%%{project_path}/badges/%%{default_branch}/pipeline.svg"
+        }
+      }
+    }
     "platform/backend" = {}
   }
 

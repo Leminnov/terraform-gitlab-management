@@ -82,8 +82,8 @@
 
 ## 5. Labels, badges and webhooks (MR 4)
 
-- [ ] 5.1 Group and project labels and badges, and project hooks (`sensitive()` on `token` and `signing_token`), with the spec validations, in `metadata.tf`. Verify `tofu validate`.
-- [ ] 5.2 Unit runs for keys, the defaults (push events on, TLS verification on), redaction of the hook tokens, and one rejected-input run per validation. Verify `mise run test` and the mutation check.
+- [x] 5.1 Group and project labels and badges, and project hooks (`sensitive()` on `token` and `signing_token`), with the spec validations, in `metadata.tf`. Verify `tofu validate`.
+- [x] 5.2 Unit runs for keys, the defaults (push events on, TLS verification on), redaction of the hook tokens, and one rejected-input run per validation. Verify `mise run test` and the mutation check.
 
 ## 6. Premium features and guardrails (MR 4)
 

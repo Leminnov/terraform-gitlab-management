@@ -5,6 +5,7 @@ Exercises every input of the module with settings that raise no guardrail warnin
 ## What this example does
 
 - Creates the groups `platform` and `platform/backend` under the demo group, and the projects `platform/docs` and `platform/backend/api`, with the module defaults: private, `main` initialised and protected for maintainers, `develop` created and protected for developers, `v*` tags protected, merges only on a green pipeline with threads resolved.
+- Gives `platform` a `bug` label and a pipeline badge that every project in it shows.
 - Nests in `platform/backend/api` a `LOG_LEVEL` variable, a read-only project deploy token, a read-only deploy key, a `production` environment and a reporter membership that expires with the tokens.
 - Creates 2 group variables (`PIPELINE_LOG_LEVEL`, and `REGISTRY_PASSWORD` masked and protected) and 1 file-type project variable.
 - Creates 1 group deploy token (`read_repository`, `read_registry`).

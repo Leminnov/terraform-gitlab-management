@@ -492,6 +492,8 @@ variable "groups" {
       - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD).
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD).
       - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600).
+      - labels        : Labels keyed by name: color (#RRGGBB or a CSS colour name), description.
+      - badges        : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
   EOT
   type = map(object({
     name                              = optional(string)
@@ -539,6 +541,14 @@ variable "groups" {
       paused          = optional(bool, false)
       locked          = optional(bool, false)
       maximum_timeout = optional(number)
+    })), {})
+    labels = optional(map(object({
+      color       = string
+      description = optional(string)
+    })), {})
+    badges = optional(map(object({
+      link_url  = string
+      image_url = string
     })), {})
   }))
   default = {}
@@ -672,6 +682,16 @@ variable "groups" {
     condition     = alltrue(flatten([for o in values(var.groups) : [for r in values(o.runners) : r.maximum_timeout == null || coalesce(r.maximum_timeout, 0) >= 600]]))
     error_message = "runners[*].maximum_timeout must be null or >= 600 (GitLab minimum)."
   }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for l in values(o.labels) : can(regex("^(#[0-9A-Fa-f]{6}|[A-Za-z]+)$", l.color))]]))
+    error_message = "labels[*].color must be #RRGGBB or a CSS colour name."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for b in values(o.badges) : can(regex("^https?://", b.link_url)) && can(regex("^https?://", b.image_url))]]))
+    error_message = "badges[*] link_url and image_url must start with http:// or https://."
+  }
 }
 
 variable "projects" {
@@ -703,6 +723,9 @@ variable "projects" {
       - pipeline_schedules  : Schedules keyed by description: ref (full ref, default refs/heads/<default_branch>), cron (5 fields), active (default true), variables (redacted in plans).
       - pipeline_triggers   : Set of pipeline trigger descriptions; their tokens are in the pipeline_trigger_tokens output.
       - environments        : Environments keyed by name: tier (production, staging, testing, development, other), external_url, description.
+      - labels              : Labels keyed by name: color (#RRGGBB or a CSS colour name), description, priority (>= 0).
+      - badges              : Badges keyed by name: link_url and image_url (http(s); GitLab placeholders such as %%{project_path} allowed, written with a doubled % in HCL strings).
+      - hooks               : Webhooks keyed by name: url (http(s)), push_events (default true), tag_push_events, merge_requests_events, pipeline_events, job_events, deployment_events, releases_events, issues_events, note_events (default false), enable_ssl_verification (default true), token and signing_token (redacted in plans, stored in state).
       - job_token_allowlist : When set, only the job tokens of this project and of the listed projects and groups (keys of projects / groups, or existing project_ids / group_ids) may access the project; null leaves GitLab's default.
   EOT
   type = map(object({
@@ -765,6 +788,30 @@ variable "projects" {
       paused          = optional(bool, false)
       locked          = optional(bool, false)
       maximum_timeout = optional(number)
+    })), {})
+    labels = optional(map(object({
+      color       = string
+      description = optional(string)
+      priority    = optional(number)
+    })), {})
+    badges = optional(map(object({
+      link_url  = string
+      image_url = string
+    })), {})
+    hooks = optional(map(object({
+      url                     = string
+      push_events             = optional(bool, true)
+      tag_push_events         = optional(bool, false)
+      merge_requests_events   = optional(bool, false)
+      pipeline_events         = optional(bool, false)
+      job_events              = optional(bool, false)
+      deployment_events       = optional(bool, false)
+      releases_events         = optional(bool, false)
+      issues_events           = optional(bool, false)
+      note_events             = optional(bool, false)
+      enable_ssl_verification = optional(bool, true)
+      token                   = optional(string)
+      signing_token           = optional(string)
     })), {})
     deploy_keys = optional(map(object({
       key        = string
@@ -972,5 +1019,25 @@ variable "projects" {
       )
     ]))
     error_message = "job_token_allowlist projects and groups must be keys of projects and groups."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for l in values(o.labels) : can(regex("^(#[0-9A-Fa-f]{6}|[A-Za-z]+)$", l.color))]]))
+    error_message = "labels[*].color must be #RRGGBB or a CSS colour name."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for b in values(o.badges) : can(regex("^https?://", b.link_url)) && can(regex("^https?://", b.image_url))]]))
+    error_message = "badges[*] link_url and image_url must start with http:// or https://."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for l in values(o.labels) : l.priority == null || coalesce(l.priority, 0) >= 0]]))
+    error_message = "labels[*].priority must be null or >= 0."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for h in values(o.hooks) : can(regex("^https?://", h.url))]]))
+    error_message = "hooks[*].url must start with http:// or https://."
   }
 }

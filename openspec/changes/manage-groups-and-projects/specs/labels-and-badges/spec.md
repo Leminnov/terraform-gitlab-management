@@ -22,10 +22,10 @@ Each `labels` entry of a group or project SHALL create a label named by its key,
 - **THEN** the plan fails with "labels[*].priority must be null or >= 0."
 
 ### Requirement: Badges
-Each `badges` entry of a group or project SHALL create a badge named by its key, keyed `"<owner key>:<name>"`, with `link_url` and `image_url`, both `http(s)` URLs that may use GitLab placeholders such as `%{project_path}`.
+Each `badges` entry of a group or project SHALL create a badge named by its key, keyed `"<owner key>:<name>"`, with `link_url` and `image_url`, both `http(s)` URLs that may use GitLab placeholders such as `%{project_path}` (written `%%{project_path}` in an HCL string).
 
 #### Scenario: Pipeline badge on a group
-- **WHEN** group `platform` sets `badges = { pipeline = { link_url = "https://gitlab.com/%{project_path}/-/pipelines", image_url = "https://gitlab.com/%{project_path}/badges/%{default_branch}/pipeline.svg" } }`
+- **WHEN** group `platform` sets `badges = { pipeline = { link_url = "https://gitlab.com/%%{project_path}/-/pipelines", image_url = "https://gitlab.com/%%{project_path}/badges/%%{default_branch}/pipeline.svg" } }`
 - **THEN** every project of `platform` shows the pipeline badge
 
 #### Scenario: Badge without a URL scheme
