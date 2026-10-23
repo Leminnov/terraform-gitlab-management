@@ -30,7 +30,6 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 - `labels` and `badges` on each `groups` and `projects` entry, and `hooks` on projects: webhooks send push events and verify TLS by default, and their `token` and `signing_token` are redacted in plans (stored in state, `SECURITY.md`).
 - Premium settings, off by default so a Free namespace plans none of them: `approval_rules`, `merge_request_approvals` (approvals reset on push, no self-approval, approvers fixed), `push_rules` (secrets, tag deletion and non-member commits rejected), `protected_environments` (maintainers deploy) and `protected_branches[*].code_owner_approval_required` on projects, and `hooks` on groups.
 - Plan-time warnings `public_visibility`, `protected_branch_force_push`, `webhook_ssl_verification` and `deploy_key_write_access`; `token_lifetime` also reads project deploy tokens and deploy keys, and every existing warning covers the objects nested in groups and projects.
-- Resources live in themed files (`groups.tf`, `projects.tf`, `access.tf`, `ci.tf`, `metadata.tf`, `premium.tf`) listed in `main.tf`; addresses are unchanged.
 - Integration fixture `tests/integration/` against a sandbox group on gitlab.com, run by `mise run test-integration` and by the CI job `test:integration:gitlab` (protected refs, release tags, weekly schedule; `create:release` waits for it): an owner run, a least-privilege run and an upgrade run from `v12.0.0`. Each applies, checks the result on the server, requires an empty second plan and destroys; `TESTING.md` describes both suites.
 - `SECURITY.md` lists what lands in state and a rotation procedure per secret class.
 - Plan-time warnings (`checks.tf`): `secret_variables_masked_and_protected` (a secret-looking variable key that is not both masked and protected), `token_lifetime` (a token expiring more than a year after the plan) and `access_token_privilege` (an `owner` access token, or one with no level, which GitLab turns into `maintainer`). They warn without blocking the apply and never print a value.
@@ -38,6 +37,7 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 ### Changed
 
 - Toolchain on the latest stable releases: OpenTofu 1.13.2 (CI also validates on 1.11.14), pre-commit 4.7.0, trivy 0.76.1, checkov 3.3.30, osv-scanner 2.7.0, mise 2026.10.17, Python 3.14.9, node 24.22.1 (LTS) and pre-commit-terraform v1.109.3, one patch above the terraform store's pin (`DEVIATION(terraform-repo-precommit)`); CI on `alpine:3.24` and `ubuntu:26.04`, one LTS above the `repository` store's `ubuntu:24.04` for the pre-commit job (`DEVIATION(repository-gitlab-ci)`).
+- Resources live in themed files (`groups.tf`, `projects.tf`, `access.tf`, `ci.tf`, `metadata.tf`, `premium.tf`) listed in `main.tf`; addresses are unchanged.
 - Repository tooling follows the `repository`, `terraform`, `git`, `gitlab` and `secrets` OpenSpec stores: exact tool pins in `mise.toml` (OpenTofu 1.13.2, tflint 0.64.0, terraform-docs 0.24.0, trivy 0.76.1, checkov 3.3.30, osv-scanner 2.7.0) with a `min_version`; pre-commit-terraform v1.109.1 with the validate, checkov and trivy hooks on `tofu`; pinned tflint ruleset; `.terraform-docs.yml` (`lockfile: false`, so the README shows the provider constraint), `.trivyignore.yaml` and `.gitattributes`.
 - `CHANGELOG.md` is curated by hand under `## [Unreleased]`. The `changelog` mise task, which regenerated it, is replaced by `changelog-draft`, `changelog-verify` and `release` (`scripts/release.sh`, `scripts/changelog.sh`); `test` and `scan` tasks are added.
 - Unit tests run on `mock_provider "gitlab"` and need no network or token.
@@ -58,6 +58,7 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 ### Security
 
 - CI variable values and pipeline schedule variable values reach the provider as sensitive values, so plan and apply output show `(sensitive value)` instead of the value. They still land in state: `SECURITY.md` now lists everything that does, with its mitigation.
+- Nested CI variable and schedule variable values and webhook `token` / `signing_token` are redacted in plans the same way. They, and the tokens GitLab creates for the new resources (project deploy tokens, pipeline trigger tokens) and for nested group deploy, access and runner tokens, land in state; `SECURITY.md` lists each one with its rotation.
 
 ### Removed
 

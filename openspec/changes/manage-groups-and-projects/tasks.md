@@ -110,15 +110,15 @@
 
 ## 8. Documentation and project instructions (MR 5)
 
-- [ ] 8.1 README: Features, Usage (tree example), Requirements and Known Limitations updated for groups and projects. Verify `pre-commit run -a` leaves the README stable.
-- [ ] 8.2 `AGENTS.md` and `openspec/config.yaml`:
+- [x] 8.1 README: Features, Usage (tree example), Requirements and Known Limitations updated for groups and projects. Verify `pre-commit run -a` leaves the README stable.
+- [x] 8.2 `AGENTS.md` and `openspec/config.yaml`:
   - the themed files and the 16 capability directories;
   - the nested-key rule;
   - Premium off by default;
   - the toolchain deviation.
 
   Verify `mise run spec-validate`, and that `openspec instructions proposal --change manage-groups-and-projects --json` shows the new context.
-- [ ] 8.3 CHANGELOG `[Unreleased]` complete for this change: Added (hierarchy, projects, nested objects, Premium options, guardrails, outputs), Changed (toolchain, file layout), and the `:` rule under Changed (breaking) with its consumer edit. Verify each proposal bullet has an entry.
+- [x] 8.3 CHANGELOG `[Unreleased]` complete for this change: Added (hierarchy, projects, nested objects, Premium options, guardrails, outputs), Changed (toolchain, file layout), and the `:` rule under Changed (breaking) with its consumer edit. Verify each proposal bullet has an entry.
 
 ## 9. Integration checks (carries adopt-store-standards 9.1, 9.3)
 

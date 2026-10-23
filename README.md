@@ -17,7 +17,8 @@ OpenTofu module that manages GitLab CI/CD settings across many groups and projec
 - **Runners** (`gitlab_user_runner`) at group, project or instance level, with their authentication tokens as a sensitive output
 - Stable `"<entry>_<target>"` resource keys: adding or reordering targets never recreates an existing resource
 - Every CI variable and schedule variable value is **redacted in plan output**; every token output is sensitive
-- **Plan-time warnings** (`check` blocks) for secret-looking variables that are not masked and protected, tokens living longer than a year, and owner or default-level access tokens
+- **Optional Premium settings** on created projects and groups (approval rules, merge request approval settings, push rules, protected environments, code-owner approval, group webhooks), never sent unless set, so a Free namespace keeps working
+- **Plan-time warnings** (`check` blocks) for secret-looking variables that are not masked and protected, tokens and deploy keys living longer than a year, owner or default-level access tokens, public groups and projects, force push on protected branches, webhooks without TLS verification and deploy keys that can push
 - No `provider {}` block: the caller configures the gitlab provider
 - Unit tests on a mock provider, and an integration fixture run against a gitlab.com sandbox as owner and as Maintainer, plus an upgrade run from v12 (empty second plan required)
 
@@ -28,6 +29,8 @@ OpenTofu module that manages GitLab CI/CD settings across many groups and projec
 | OpenTofu | >= 1.11 |
 | gitlabhq/gitlab provider | ~> 19.5 |
 | GitLab | gitlab.com; self-managed GitLab with the API level of provider 19.5 |
+
+Creating groups under `parent_group_id` needs the Owner role on it; the token also needs the `api` scope (and `create_runner` for runners).
 
 ### Compatibility
 
@@ -72,8 +75,13 @@ module "gitlab_management" {
   }
 
   projects = {
-    "platform/infra/terraform-modules" = {}                                   # main + develop, protected
-    "platform/docs"                    = { branches = {}, merge_method = "ff" } # trunk-based
+    "platform/infra/terraform-modules" = { # main + develop, protected
+      # Nested objects are keyed "<project key>:<item key>".
+      variables          = { TF_LOG = { value = "INFO" } }
+      members            = { reviewer = { user_id = 1234567, access_level = "reporter", expires_at = "2027-06-30" } }
+      pipeline_schedules = { nightly = { cron = "0 2 * * *" } } # on refs/heads/main
+    }
+    "platform/docs" = { branches = {}, merge_method = "ff" } # trunk-based
   }
 }
 ```

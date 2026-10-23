@@ -1,9 +1,11 @@
 # AGENTS.md — terraform-modules-gitlab-management
 
 ## Project
-OpenTofu/Terraform module that manages GitLab CI/CD settings: group and project
-CI/CD variables, group deploy tokens, pipeline schedules and their variables,
-runners, and group and project access tokens. Published at
+OpenTofu/Terraform module that creates a GitLab group and project tree (up to 7
+levels under an existing parent group) with safe defaults and objects nested in
+each group and project, and manages GitLab CI/CD settings on existing groups and
+projects: CI/CD variables, group deploy tokens, pipeline schedules and their
+variables, runners, and group and project access tokens. Published at
 `gitlab.com/leminnov/terraform/modules/gitlab-management`; consumers pin a git tag.
 Planning uses OpenSpec (`openspec/`; `openspec/specs/` is the current contract).
 Engineering standards live in the `quality`, `repository`, `terraform`, `git`,
@@ -28,16 +30,22 @@ The checkable form of each line is the `quality` store (`quality-simplicity`,
   default, and reaches the provider through a write-only `*_wo` argument with a
   `*_wo_version` companion. Where the provider has no write-only argument, say so and
   list the value in `SECURITY.md` (what lands in state). Known exceptions today (provider
-  19.5 has no write-only argument for them): CI variable and schedule variable values,
-  sent through `sensitive()` because `for_each` iterates the inputs
-  (`DEVIATION(terraform-variables)`), and every token GitLab creates. Every output carrying
-  a token is `sensitive`; no output returns a variable value.
-- `for_each` over `count`; resource label `this`; snake_case everywhere; fan-out
-  keys stay `"<entry>_<target>"` (changing them replaces resources: needs `moved` blocks).
+  19.5 has no write-only argument for them): CI variable and schedule variable values
+  and webhook `token` / `signing_token`, sent through `sensitive()` because `for_each`
+  iterates the inputs (`DEVIATION(terraform-variables)`), and every token GitLab
+  creates. Every output carrying a token is `sensitive`; no output returns a variable
+  value.
+- `for_each` over `count`; resource label `this`; snake_case everywhere. Keys are stable:
+  fan-out `"<entry>_<target>"`, created groups and projects by their path, objects nested
+  in them `"<owner key>:<item key>"` (so standalone keys may not contain `:`). Changing a
+  key replaces resources: it needs `moved` blocks.
+- Resources live in themed files listed in the header of `main.tf` (`groups.tf`,
+  `projects.tf`, `access.tf`, `ci.tf`, `metadata.tf`, `premium.tf`, `checks.tf`).
+- Premium-only settings default to `{}` or `null`, so a Free namespace plans none of them.
 - Send values in the form GitLab reads back: a second plan after apply must be empty.
 - Dangerous but legal settings get a `check` block in `checks.tf` whose message names the
   entries, never a value; settings that are never acceptable get a `validation`.
-- Every behaviour change ships with a unit test in `tests/main.tftest.hcl` (a
+- Every behaviour change ships with a unit test in the `tests/*.tftest.hcl` file of its area (a
   rejected-input run for each new validation, valid in every other respect, and a run per
   `check`), the integration fixture in `tests/integration/` when GitLab is involved, an
   update to `examples/complete/` (and any example it affects), and a `CHANGELOG.md` entry
@@ -152,6 +160,10 @@ One line per spec (its Purpose), to pick what to fetch with `openspec show <spec
 2. This file's non-negotiables
 3. The referenced store standards (`quality`, `repository`, `terraform`, `git`, `gitlab`, `secrets`, `openspec`)
 4. Existing patterns in this repository (`openspec/specs/` describes the current contract)
+
+Standing deviation: pre-commit-terraform v1.109.3, one patch above the `terraform`
+store's v1.109.1 (`DEVIATION(terraform-repo-precommit)` in `.pre-commit-config.yaml`), by
+maintainer decision to run the latest stable toolchain.
 
 Never deviate silently: add a `# DEVIATION(<spec-id>): <reason>` comment and list it
 in your summary.
