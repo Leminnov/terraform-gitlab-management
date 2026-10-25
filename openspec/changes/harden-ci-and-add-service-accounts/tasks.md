@@ -50,15 +50,15 @@
 
 ## 3. Hardened CI settings, freeze periods, secure files, catalog (design 3, 4)
 
-- [ ] 3.1 `variables.tf`:
+- [x] 3.1 `variables.tf`:
   - the `projects[*].ci` object with `hardening_enabled` (default `false`), the seven security fields without defaults (hardened values applied in `locals.tf`), and the null optional fields (Premium fields included, wired in group 7);
   - `groups[*].shared_runners_setting`;
   - `freeze_periods`, `secure_files`, `cicd_catalog`;
   - validations from the specs: override role, auto-cancel, timeout, git depth, retention, sub claim, shared runner setting, freeze cron, secure file names and content, catalog description.
 
   Verify `tofu validate`.
-- [ ] 3.2 `projects.tf` sends the `ci` fields. `groups.tf` sends `shared_runners_setting` on all seven levels. `ci.tf`: `gitlab_project_freeze_period`, `gitlab_project_secure_file` (`sensitive()` and the `DEVIATION(terraform-variables)` comment), `gitlab_project_cicd_catalog`. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 3.3 `tests/ci.tftest.hcl`:
+- [x] 3.2 `projects.tf` sends the `ci` fields. `groups.tf` sends `shared_runners_setting` on all seven levels. `ci.tf`: `gitlab_project_freeze_period`, `gitlab_project_secure_file` (`sensitive()` and the `DEVIATION(terraform-variables)` comment), `gitlab_project_cicd_catalog`. Verify `tofu validate` and `tflint --recursive`.
+- [x] 3.3 `tests/ci.tftest.hcl`:
   - a bare project sending none of the seven settings;
   - `hardening_enabled = true` sending each hardened value;
   - an explicit value winning over hardening, and one set without it;
@@ -70,7 +70,7 @@
   - one rejected-input run per new validation.
 
   Verify `mise run test` and the mutation check.
-- [ ] 3.4 `SECURITY.md` row for secure file content and its rotation. CHANGELOG Added: opt-in CI hardening, freeze periods, secure files, catalog, group runner setting. `examples/complete`: a hardened project with a freeze period and pipeline retention. Verify `pre-commit run -a` and the example plan without warnings.
+- [x] 3.4 `SECURITY.md` row for secure file content and its rotation. CHANGELOG Added: opt-in CI hardening, freeze periods, secure files, catalog, group runner setting. `examples/complete`: a hardened project with a freeze period and pipeline retention. Verify `pre-commit run -a` and the example plan without warnings.
 
 ## 4. Cross-project runners and deploy keys (design 5)
 

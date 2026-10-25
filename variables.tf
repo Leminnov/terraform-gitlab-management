@@ -586,6 +586,7 @@ variable "groups" {
       - require_two_factor_authentication : Require two-factor authentication for members; null keeps the GitLab default.
       - archive_on_destroy                : Archive the group instead of deleting it on destroy; default true.
       - permanently_remove_on_delete      : With archive_on_destroy = false, remove the group at once instead of scheduling the deletion; default false.
+      - shared_runners_setting            : Instance runners for the group's subgroups and projects: enabled, disabled_and_overridable, disabled_and_unoverridable, disabled_with_override; null keeps GitLab's inherited value.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
@@ -608,6 +609,7 @@ variable "groups" {
     require_two_factor_authentication = optional(bool)
     archive_on_destroy                = optional(bool, true)
     permanently_remove_on_delete      = optional(bool, false)
+    shared_runners_setting            = optional(string)
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -894,6 +896,11 @@ variable "groups" {
     ]))
     error_message = "access_tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
   }
+
+  validation {
+    condition     = alltrue([for v in values(var.groups) : v.shared_runners_setting == null || contains(["enabled", "disabled_and_overridable", "disabled_and_unoverridable", "disabled_with_override"], coalesce(v.shared_runners_setting, "-"))])
+    error_message = "groups[*].shared_runners_setting must be one of: enabled, disabled_and_overridable, disabled_and_unoverridable, disabled_with_override."
+  }
 }
 
 variable "projects" {
@@ -915,6 +922,10 @@ variable "projects" {
       - remove_source_branch_after_merge                 : Delete the source branch on merge by default; default true.
       - archive_on_destroy            : Archive the project instead of deleting it on destroy; default true.
       - permanently_delete_on_destroy : With archive_on_destroy = false, delete the project at once instead of scheduling the deletion; default false.
+      - ci                      : CI/CD settings. hardening_enabled (default false) sends, unless set explicitly, public_jobs = false, pipeline_variables_minimum_override_role = no_one_allowed, protect_merge_request_pipelines = true, separated_caches = true, forward_deployment_enabled = true, push_repository_for_job_token_allowed = false and allow_merge_on_skipped_pipeline = false; with hardening off only the explicit ones are sent. Other fields, null keeping GitLab's value: config_path, auto_cancel_pending_pipelines (enabled, disabled), build_timeout (600-2592000 s), default_git_depth (0-1000), delete_pipelines_in_seconds (86400-31536000), id_token_sub_claim_components (project_path first, then ref_type, ref), group_runners_enabled, shared_runners_enabled. Premium: merge_pipelines_enabled, merge_trains_enabled, restrict_pipeline_cancellation_role (developer, maintainer, no_one), allow_pipeline_trigger_approve_deployment.
+      - freeze_periods          : Deploy freezes keyed by label: freeze_start and freeze_end (5-field cron), cron_timezone (default UTC).
+      - secure_files            : CI/CD secure files keyed by file name (no /), with their text content. Redacted in plans, stored in state (SECURITY.md).
+      - cicd_catalog            : Publish the project as a CI/CD catalog resource; default false. Needs a description.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
@@ -962,6 +973,39 @@ variable "projects" {
     remove_source_branch_after_merge                 = optional(bool, true)
     archive_on_destroy                               = optional(bool, true)
     permanently_delete_on_destroy                    = optional(bool, false)
+    ci = optional(object({
+      hardening_enabled = optional(bool, false)
+      # Security settings: null takes the hardened value when hardening is on,
+      # and sends nothing otherwise (locals.tf).
+      public_jobs                              = optional(bool)
+      pipeline_variables_minimum_override_role = optional(string)
+      protect_merge_request_pipelines          = optional(bool)
+      separated_caches                         = optional(bool)
+      forward_deployment_enabled               = optional(bool)
+      push_repository_for_job_token_allowed    = optional(bool)
+      allow_merge_on_skipped_pipeline          = optional(bool)
+      # Other settings: null keeps GitLab's value.
+      config_path                   = optional(string)
+      auto_cancel_pending_pipelines = optional(string)
+      build_timeout                 = optional(number)
+      default_git_depth             = optional(number)
+      delete_pipelines_in_seconds   = optional(number)
+      id_token_sub_claim_components = optional(list(string))
+      group_runners_enabled         = optional(bool)
+      shared_runners_enabled        = optional(bool)
+      # Premium
+      merge_pipelines_enabled                   = optional(bool)
+      merge_trains_enabled                      = optional(bool)
+      restrict_pipeline_cancellation_role       = optional(string)
+      allow_pipeline_trigger_approve_deployment = optional(bool)
+    }), {})
+    freeze_periods = optional(map(object({
+      freeze_start  = string
+      freeze_end    = string
+      cron_timezone = optional(string, "UTC")
+    })), {})
+    secure_files = optional(map(string), {})
+    cicd_catalog = optional(bool, false)
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -1372,5 +1416,57 @@ variable "projects" {
       )
     ]))
     error_message = "access_tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.pipeline_variables_minimum_override_role == null || contains(["no_one_allowed", "developer", "maintainer", "owner"], coalesce(v.ci.pipeline_variables_minimum_override_role, "-"))])
+    error_message = "ci.pipeline_variables_minimum_override_role must be one of: no_one_allowed, developer, maintainer, owner."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.auto_cancel_pending_pipelines == null || contains(["enabled", "disabled"], coalesce(v.ci.auto_cancel_pending_pipelines, "-"))])
+    error_message = "ci.auto_cancel_pending_pipelines must be enabled or disabled."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.build_timeout == null ? true : v.ci.build_timeout >= 600 && v.ci.build_timeout <= 2592000])
+    error_message = "ci.build_timeout must be null or between 600 and 2592000 seconds (10 minutes to 30 days)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.default_git_depth == null ? true : v.ci.default_git_depth >= 0 && v.ci.default_git_depth <= 1000])
+    error_message = "ci.default_git_depth must be null or between 0 and 1000."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.delete_pipelines_in_seconds == null ? true : v.ci.delete_pipelines_in_seconds >= 86400 && v.ci.delete_pipelines_in_seconds <= 31536000])
+    error_message = "ci.delete_pipelines_in_seconds must be null or between 86400 and 31536000 seconds (1 day to 1 year)."
+  }
+
+  validation {
+    condition = alltrue([
+      for v in values(var.projects) : v.ci.id_token_sub_claim_components == null ? true : (
+        length(v.ci.id_token_sub_claim_components) == 0 ? false : (
+          v.ci.id_token_sub_claim_components[0] == "project_path" &&
+          alltrue([for c in slice(v.ci.id_token_sub_claim_components, 1, length(v.ci.id_token_sub_claim_components)) : contains(["ref_type", "ref"], c)])
+        )
+      )
+    ])
+    error_message = "ci.id_token_sub_claim_components must start with project_path and otherwise contain only ref_type and ref."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for f in values(o.freeze_periods) : length(split(" ", trimspace(f.freeze_start))) == 5 && length(split(" ", trimspace(f.freeze_end))) == 5]]))
+    error_message = "freeze_periods[*].freeze_start and freeze_end must be cron expressions with 5 fields."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for name, content in o.secure_files : trimspace(name) != "" && !strcontains(name, "/") && content != ""]]))
+    error_message = "secure_files keys must be file names without / and values non-empty text."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : !v.cicd_catalog || trimspace(coalesce(v.description, " ")) != ""])
+    error_message = "projects[*].cicd_catalog requires a description (GitLab lists catalog projects by it)."
   }
 }

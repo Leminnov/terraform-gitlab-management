@@ -13,7 +13,9 @@
 #   ci.tf       gitlab_group_variable, gitlab_project_variable,
 #               gitlab_pipeline_schedule, gitlab_pipeline_schedule_variable,
 #               gitlab_user_runner, gitlab_project_environment,
-#               gitlab_pipeline_trigger, gitlab_project_job_token_scopes
+#               gitlab_pipeline_trigger, gitlab_project_job_token_scopes,
+#               gitlab_project_freeze_period, gitlab_project_secure_file,
+#               gitlab_project_cicd_catalog
 #   metadata.tf gitlab_group_label, gitlab_project_label, gitlab_group_badge,
 #               gitlab_project_badge, gitlab_project_hook
 #   premium.tf  gitlab_project_approval_rule, gitlab_project_level_mr_approvals,

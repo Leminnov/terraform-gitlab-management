@@ -1,6 +1,7 @@
 # CI/CD objects: group and project variables, pipeline schedules and their
-# variables, runners, and the environments, pipeline triggers and job token
-# allowlists of created projects.
+# variables, runners, and the environments, pipeline triggers, job token
+# allowlists, freeze periods, secure files and CI/CD catalog flag of created
+# projects.
 
 # DEVIATION(terraform-variables): the value input cannot be sensitive = true
 # because for_each iterates it, and the provider has no value_wo; sensitive()
@@ -93,4 +94,32 @@ resource "gitlab_project_job_token_scopes" "this" {
   enabled            = true
   target_project_ids = each.value.target_project_ids
   target_group_ids   = each.value.target_group_ids
+}
+
+resource "gitlab_project_freeze_period" "this" {
+  for_each = local.project_freeze_periods
+
+  project       = each.value.project
+  freeze_start  = each.value.freeze_start
+  freeze_end    = each.value.freeze_end
+  cron_timezone = each.value.cron_timezone
+}
+
+# DEVIATION(terraform-variables): secure file contents cannot come from a
+# sensitive = true input because for_each iterates it, and the provider has no
+# write-only argument; sensitive() keeps them out of plan output. They still
+# land in state (SECURITY.md).
+resource "gitlab_project_secure_file" "this" {
+  for_each = local.project_secure_files
+
+  project = each.value.project
+  name    = each.value.name
+  content = sensitive(each.value.content)
+}
+
+resource "gitlab_project_cicd_catalog" "this" {
+  for_each = { for pk, pr in var.projects : pk => local.project_ids[pk] if pr.cicd_catalog }
+
+  project = each.value
+  enabled = true
 }

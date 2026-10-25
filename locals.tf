@@ -186,6 +186,17 @@ locals {
       # The provider rejects both arguments together, even when one is false.
       archive_on_destroy            = v.archive_on_destroy ? true : null
       permanently_delete_on_destroy = v.archive_on_destroy ? null : v.permanently_delete_on_destroy
+      # Each security setting: the explicit value, else the hardened one when
+      # hardening is on, else null (nothing sent, GitLab's value kept).
+      ci = merge(v.ci, {
+        public_jobs                              = v.ci.public_jobs != null ? v.ci.public_jobs : (v.ci.hardening_enabled ? false : null)
+        pipeline_variables_minimum_override_role = v.ci.pipeline_variables_minimum_override_role != null ? v.ci.pipeline_variables_minimum_override_role : (v.ci.hardening_enabled ? "no_one_allowed" : null)
+        protect_merge_request_pipelines          = v.ci.protect_merge_request_pipelines != null ? v.ci.protect_merge_request_pipelines : (v.ci.hardening_enabled ? true : null)
+        separated_caches                         = v.ci.separated_caches != null ? v.ci.separated_caches : (v.ci.hardening_enabled ? true : null)
+        forward_deployment_enabled               = v.ci.forward_deployment_enabled != null ? v.ci.forward_deployment_enabled : (v.ci.hardening_enabled ? true : null)
+        push_repository_for_job_token_allowed    = v.ci.push_repository_for_job_token_allowed != null ? v.ci.push_repository_for_job_token_allowed : (v.ci.hardening_enabled ? false : null)
+        allow_merge_on_skipped_pipeline          = v.ci.allow_merge_on_skipped_pipeline != null ? v.ci.allow_merge_on_skipped_pipeline : (v.ci.hardening_enabled ? false : null)
+      })
     })
   }
 
@@ -276,6 +287,18 @@ locals {
         project  = local.project_ids[pk]
         group_id = sh.group != null ? tonumber(local.group_ids[sh.group]) : sh.group_id
       })
+    }
+  ]...)
+
+  project_freeze_periods = merge([
+    for pk, pr in var.projects : {
+      for label, f in pr.freeze_periods : "${pk}:${label}" => merge(f, { project = local.project_ids[pk] })
+    }
+  ]...)
+
+  project_secure_files = merge([
+    for pk, pr in var.projects : {
+      for name, content in pr.secure_files : "${pk}:${name}" => { project = local.project_ids[pk], name = name, content = content }
     }
   ]...)
 

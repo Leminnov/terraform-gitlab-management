@@ -17,6 +17,7 @@ resource "gitlab_group" "level_1" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).
@@ -43,6 +44,7 @@ resource "gitlab_group" "level_2" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).
@@ -69,6 +71,7 @@ resource "gitlab_group" "level_3" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).
@@ -95,6 +98,7 @@ resource "gitlab_group" "level_4" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).
@@ -121,6 +125,7 @@ resource "gitlab_group" "level_5" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).
@@ -147,6 +152,7 @@ resource "gitlab_group" "level_6" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).
@@ -173,6 +179,7 @@ resource "gitlab_group" "level_7" {
   require_two_factor_authentication = each.value.require_two_factor_authentication
   archive_on_destroy                = each.value.archive_on_destroy
   permanently_remove_on_delete      = each.value.permanently_remove_on_delete
+  shared_runners_setting            = each.value.shared_runners_setting
 
   # Projects created later in the group start with main protected for
   # maintainers (gitlab-project-settings).

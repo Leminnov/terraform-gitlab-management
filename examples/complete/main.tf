@@ -56,7 +56,13 @@ module "gitlab_management" {
   }
 
   projects = {
-    "platform/docs" = { description = "Platform documentation" }
+    "platform/docs" = {
+      description = "Platform documentation"
+      # Opt-in CI hardening, a pipeline retention of 90 days and a weekend
+      # deploy freeze.
+      ci             = { hardening_enabled = true, delete_pipelines_in_seconds = 7776000 }
+      freeze_periods = { weekend = { freeze_start = "0 18 * * 5", freeze_end = "0 6 * * 1" } }
+    }
     "platform/backend/api" = {
       topics = ["api"]
 
