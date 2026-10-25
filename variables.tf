@@ -928,6 +928,10 @@ variable "projects" {
       - cicd_catalog            : Publish the project as a CI/CD catalog resource; default false. Needs a description.
       - enabled_runners         : Unlocked project runners of other created projects to enable here, as "<project key>:<runner name>"; enabled_runner_ids for existing runners by ID.
       - enabled_deploy_keys     : Deploy keys of other created projects to enable here read-only, as "<project key>:<title>"; enabled_deploy_key_ids for existing deploy keys by ID.
+      - package_protection_rules       : Keyed by label: package_type (cargo, conan, generic, helm, maven, npm, nuget, pypi, terraform_module), package_name_pattern (wildcard *), minimum_access_level_for_push (maintainer (default), owner, admin), minimum_access_level_for_delete (null, owner, admin).
+      - container_protection_rules     : Keyed by label: path_pattern, appended to the project's full path ("*" for every image), minimum_access_level_for_push and minimum_access_level_for_delete (maintainer (default), owner, admin).
+      - container_tag_protection_rules : Keyed by label: tag_name_pattern (regular expression, 1-100 characters), minimum_access_level_for_push and minimum_access_level_for_delete (maintainer (default), owner, admin). Ultimate: immutable = true (no access levels then).
+      - container_expiration_policy    : null keeps GitLab's cleanup policy; when set, cleanup is enabled with cadence (1d, 7d (default), 14d, 1month, 3month), keep_n (1, 5, 10 (default), 25, 50, 100), older_than (7d, 14d, 30d, 90d (default)), name_regex_delete (default .*) and name_regex_keep.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
@@ -1013,6 +1017,32 @@ variable "projects" {
     enabled_runner_ids     = optional(set(number), [])
     enabled_deploy_keys    = optional(set(string), [])
     enabled_deploy_key_ids = optional(set(number), [])
+    # Registries
+    package_protection_rules = optional(map(object({
+      package_type                    = string
+      package_name_pattern            = string
+      minimum_access_level_for_push   = optional(string, "maintainer")
+      minimum_access_level_for_delete = optional(string)
+    })), {})
+    container_protection_rules = optional(map(object({
+      path_pattern                    = string
+      minimum_access_level_for_push   = optional(string, "maintainer")
+      minimum_access_level_for_delete = optional(string, "maintainer")
+    })), {})
+    container_tag_protection_rules = optional(map(object({
+      tag_name_pattern                = string
+      minimum_access_level_for_push   = optional(string, "maintainer")
+      minimum_access_level_for_delete = optional(string, "maintainer")
+      # Ultimate
+      immutable = optional(bool, false)
+    })), {})
+    container_expiration_policy = optional(object({
+      cadence           = optional(string, "7d")
+      keep_n            = optional(number, 10)
+      older_than        = optional(string, "90d")
+      name_regex_delete = optional(string, ".*")
+      name_regex_keep   = optional(string)
+    }))
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -1497,5 +1527,40 @@ variable "projects" {
       ]
     ]))
     error_message = "enabled_deploy_keys entries must name a deploy key of another created project, as \"<project key>:<title>\"."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.package_protection_rules) : contains(["cargo", "conan", "generic", "helm", "maven", "npm", "nuget", "pypi", "terraform_module"], r.package_type)]]))
+    error_message = "package_protection_rules[*].package_type must be one of: cargo, conan, generic, helm, maven, npm, nuget, pypi, terraform_module."
+  }
+
+  validation {
+    condition = alltrue(flatten([for o in values(var.projects) : [
+      for r in values(o.package_protection_rules) : trimspace(r.package_name_pattern) != "" && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_push) && (r.minimum_access_level_for_delete == null || contains(["owner", "admin"], coalesce(r.minimum_access_level_for_delete, "-")))
+    ]]))
+    error_message = "package_protection_rules[*] needs a package_name_pattern, minimum_access_level_for_push maintainer, owner or admin, and minimum_access_level_for_delete null, owner or admin."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.container_protection_rules) : contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_push) && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_delete)]]))
+    error_message = "container_protection_rules[*] access levels must be maintainer, owner or admin."
+  }
+
+  validation {
+    condition = alltrue(flatten([for o in values(var.projects) : [
+      for r in values(o.container_tag_protection_rules) : length(r.tag_name_pattern) >= 1 && length(r.tag_name_pattern) <= 100 && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_push) && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_delete)
+    ]]))
+    error_message = "container_tag_protection_rules[*] needs a tag_name_pattern of 1 to 100 characters and access levels maintainer, owner or admin."
+  }
+
+  validation {
+    condition = alltrue([
+      for o in values(var.projects) : o.container_expiration_policy == null ? true : (
+        contains(["1d", "7d", "14d", "1month", "3month"], o.container_expiration_policy.cadence) &&
+        contains([1, 5, 10, 25, 50, 100], o.container_expiration_policy.keep_n) &&
+        contains(["7d", "14d", "30d", "90d"], o.container_expiration_policy.older_than)
+      )
+    ])
+    error_message = "container_expiration_policy cadence must be 1d, 7d, 14d, 1month or 3month, keep_n one of 1, 5, 10, 25, 50, 100, and older_than one of 7d, 14d, 30d, 90d."
   }
 }

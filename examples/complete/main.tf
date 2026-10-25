@@ -76,6 +76,10 @@ module "gitlab_management" {
         release  = { service_account = "platform/backend/api:release", access_level = "developer" }
       }
 
+      # Only maintainers push release packages and v* images.
+      package_protection_rules       = { npm = { package_type = "npm", package_name_pattern = "@my-org/*" } }
+      container_tag_protection_rules = { release = { tag_name_pattern = "^v[0-9]+" } }
+
       # A project service account (Free tier) with a token rotated by apply.
       service_accounts = {
         release = { tokens = { ci = { scopes = ["write_repository"], rotation_configuration = { expiration_days = 90, rotate_before_days = 14 } } } }

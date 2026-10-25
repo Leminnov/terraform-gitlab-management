@@ -42,6 +42,21 @@ resource "gitlab_project" "this" {
   ci_id_token_sub_claim_components            = each.value.ci.id_token_sub_claim_components
   group_runners_enabled                       = each.value.ci.group_runners_enabled
   shared_runners_enabled                      = each.value.ci.shared_runners_enabled
+
+  # Container cleanup, only when the caller sets a policy: deleting images is
+  # never a default.
+  dynamic "container_expiration_policy" {
+    for_each = each.value.container_expiration_policy == null ? [] : [each.value.container_expiration_policy]
+
+    content {
+      enabled           = true
+      cadence           = container_expiration_policy.value.cadence
+      keep_n            = container_expiration_policy.value.keep_n
+      older_than        = container_expiration_policy.value.older_than
+      name_regex_delete = container_expiration_policy.value.name_regex_delete
+      name_regex_keep   = container_expiration_policy.value.name_regex_keep
+    }
+  }
 }
 
 resource "gitlab_branch" "this" {

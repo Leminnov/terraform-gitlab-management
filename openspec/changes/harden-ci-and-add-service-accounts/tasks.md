@@ -80,8 +80,8 @@
 
 ## 5. Registry protection (design 6)
 
-- [ ] 5.1 `package_protection_rules`, `container_protection_rules`, `container_tag_protection_rules` and `container_expiration_policy` on `projects`, with their validations. `registry.tf` holds the three rule resources: upper-cased tag levels; null levels when `immutable`; repository path prefixed with `path_with_namespace`. The dynamic `container_expiration_policy` block goes on `gitlab_project`. `main.tf` header. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 5.2 `tests/registry.tftest.hcl`:
+- [x] 5.1 `package_protection_rules`, `container_protection_rules`, `container_tag_protection_rules` and `container_expiration_policy` on `projects`, with their validations. `registry.tf` holds the three rule resources: upper-cased tag levels; null levels when `immutable`; repository path prefixed with `path_with_namespace`. The dynamic `container_expiration_policy` block goes on `gitlab_project`. `main.tf` header. Verify `tofu validate` and `tflint --recursive`.
+- [x] 5.2 `tests/registry.tftest.hcl`:
   - keys;
   - push default `maintainer`;
   - delete level not sent when null;
@@ -91,7 +91,7 @@
   - one rejected run per validation.
 
   Verify `mise run test` and the mutation check.
-- [ ] 5.3 CHANGELOG Added. `examples/complete`: a package rule and a protected container tag. Verify `pre-commit run -a` and the example plan.
+- [x] 5.3 CHANGELOG Added. `examples/complete`: a package rule and a protected container tag. Verify `pre-commit run -a` and the example plan.
 
 ## 6. Repository files and Kubernetes agents (design 7, 8)
 

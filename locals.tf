@@ -318,6 +318,24 @@ locals {
     ]
   ])...)
 
+  package_protection_rules = merge([
+    for pk, pr in var.projects : {
+      for label, r in pr.package_protection_rules : "${pk}:${label}" => merge(r, { project = local.project_ids[pk] })
+    }
+  ]...)
+
+  container_protection_rules = merge([
+    for pk, pr in var.projects : {
+      for label, r in pr.container_protection_rules : "${pk}:${label}" => merge(r, { project = local.project_ids[pk], project_key = pk })
+    }
+  ]...)
+
+  container_tag_protection_rules = merge([
+    for pk, pr in var.projects : {
+      for label, r in pr.container_tag_protection_rules : "${pk}:${label}" => merge(r, { project = local.project_ids[pk] })
+    }
+  ]...)
+
   project_environments = merge([
     for pk, pr in var.projects : {
       for name, e in pr.environments : "${pk}:${name}" => merge(e, { project = local.project_ids[pk], name = name })
