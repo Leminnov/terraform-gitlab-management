@@ -76,6 +76,15 @@ module "gitlab_management" {
         release  = { service_account = "platform/backend/api:release", access_level = "developer" }
       }
 
+      # Governed files: CODEOWNERS owned by Terraform, the pipeline seeded once
+      # and then owned by the developers. A Kubernetes agent whose cluster the
+      # pipelines of the platform group can reach.
+      files = {
+        CODEOWNERS       = { content = "* @my-org/platform\n" }
+        ".gitlab-ci.yml" = { content = "include:\n  - project: my-org/ci-templates\n    file: terraform.yml\n", managed = false }
+      }
+      kubernetes_agents = { prod = { ci_access = { groups = ["platform"] } } }
+
       # Only maintainers push release packages and v* images.
       package_protection_rules       = { npm = { package_type = "npm", package_name_pattern = "@my-org/*" } }
       container_tag_protection_rules = { release = { tag_name_pattern = "^v[0-9]+" } }

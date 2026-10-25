@@ -130,3 +130,18 @@ resource "gitlab_project_runner_enablement" "this" {
   project   = each.value.project
   runner_id = each.value.runner_id
 }
+
+resource "gitlab_cluster_agent" "this" {
+  for_each = local.kubernetes_agents
+
+  project = each.value.project
+  name    = each.value.name
+}
+
+resource "gitlab_cluster_agent_token" "this" {
+  for_each = local.kubernetes_agents
+
+  project  = each.value.project
+  agent_id = gitlab_cluster_agent.this[each.key].agent_id
+  name     = each.value.name
+}

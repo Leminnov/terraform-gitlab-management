@@ -65,6 +65,10 @@ resource "gitlab_branch" "this" {
   project = gitlab_project.this[each.value.project].id
   name    = each.value.name
   ref     = each.value.ref
+
+  # Branches start from the default branch once its files are committed, so
+  # develop holds them too.
+  depends_on = [gitlab_repository_file.managed, gitlab_repository_file.seeded]
 }
 
 # One protection per branch: the provider takes over the default-branch

@@ -95,8 +95,8 @@
 
 ## 6. Repository files and Kubernetes agents (design 7, 8)
 
-- [ ] 6.1 `projects[*].files` and `projects[*].kubernetes_agents`, with their validations: relative path, encoding, default branch required, agent name, `ci_access` keys, no hand-written agent config. In `files.tf`: `gitlab_repository_file.managed` and `.seeded` (seeded with `ignore_changes`), and `gitlab_branch.this` `depends_on` both. In `ci.tf`: `gitlab_cluster_agent.this` and `gitlab_cluster_agent_token.this`, plus the agent `config.yaml` merged into the managed files. `outputs.tf`: the sensitive `kubernetes_agent_tokens`. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 6.2 `tests/files.tftest.hcl`:
+- [x] 6.1 `projects[*].files` and `projects[*].kubernetes_agents`, with their validations: relative path, encoding, default branch required, agent name, `ci_access` keys, no hand-written agent config. In `files.tf`: `gitlab_repository_file.managed` and `.seeded` (seeded with `ignore_changes`), and `gitlab_branch.this` `depends_on` both. In `ci.tf`: `gitlab_cluster_agent.this` and `gitlab_cluster_agent_token.this`, plus the agent `config.yaml` merged into the managed files. `outputs.tf`: the sensitive `kubernetes_agent_tokens`. Verify `tofu validate` and `tflint --recursive`.
+- [x] 6.2 `tests/files.tftest.hcl`:
   - managed and seeded keys;
   - branch equal to the default branch;
   - `overwrite_on_create`;
@@ -106,7 +106,7 @@
   - one rejected run per validation.
 
   Verify `mise run test` and the mutation check.
-- [ ] 6.3 `SECURITY.md` row for agent tokens and their rotation. README Known Limitations: commits to the default branch versus branch protection and push rules; one commit per file; text-only secure files. CHANGELOG Added. `examples/complete`: a managed `CODEOWNERS`, a seeded file and an agent. Verify `pre-commit run -a` and the example plan.
+- [x] 6.3 `SECURITY.md` row for agent tokens and their rotation. README Known Limitations: commits to the default branch versus branch protection and push rules; one commit per file; text-only secure files. CHANGELOG Added. `examples/complete`: a managed `CODEOWNERS`, a seeded file and an agent. Verify `pre-commit run -a` and the example plan.
 
 ## 7. Premium and Ultimate additions (design 9)
 

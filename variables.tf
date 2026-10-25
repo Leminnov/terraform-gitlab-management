@@ -931,6 +931,8 @@ variable "projects" {
       - package_protection_rules       : Keyed by label: package_type (cargo, conan, generic, helm, maven, npm, nuget, pypi, terraform_module), package_name_pattern (wildcard *), minimum_access_level_for_push (maintainer (default), owner, admin), minimum_access_level_for_delete (null, owner, admin).
       - container_protection_rules     : Keyed by label: path_pattern, appended to the project's full path ("*" for every image), minimum_access_level_for_push and minimum_access_level_for_delete (maintainer (default), owner, admin).
       - container_tag_protection_rules : Keyed by label: tag_name_pattern (regular expression, 1-100 characters), minimum_access_level_for_push and minimum_access_level_for_delete (maintainer (default), owner, admin). Ultimate: immutable = true (no access levels then).
+      - files                          : Files committed to the default branch, keyed by relative path: content, encoding (text (default) or base64), executable (default false), managed (default true: Terraform owns the content and reverts edits; false: committed once, then owned by the developers). Branches created by the module include them.
+      - kubernetes_agents              : GitLab agents for Kubernetes keyed by name (DNS label), each with a token (kubernetes_agent_tokens output) and ci_access { groups, projects (keys of groups / projects), group_paths, project_paths (existing full paths) } written to the managed file .gitlab/agents/<name>/config.yaml.
       - container_expiration_policy    : null keeps GitLab's cleanup policy; when set, cleanup is enabled with cadence (1d, 7d (default), 14d, 1month, 3month), keep_n (1, 5, 10 (default), 25, 50, 100), older_than (7d, 14d, 30d, 90d (default)), name_regex_delete (default .*) and name_regex_keep.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
@@ -1043,6 +1045,21 @@ variable "projects" {
       name_regex_delete = optional(string, ".*")
       name_regex_keep   = optional(string)
     }))
+    # Repository content
+    files = optional(map(object({
+      content    = string
+      managed    = optional(bool, true)
+      encoding   = optional(string, "text")
+      executable = optional(bool, false)
+    })), {})
+    kubernetes_agents = optional(map(object({
+      ci_access = optional(object({
+        groups        = optional(set(string), [])
+        projects      = optional(set(string), [])
+        group_paths   = optional(set(string), [])
+        project_paths = optional(set(string), [])
+      }), {})
+    })), {})
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -1562,5 +1579,40 @@ variable "projects" {
       )
     ])
     error_message = "container_expiration_policy cadence must be 1d, 7d, 14d, 1month or 3month, keep_n one of 1, 5, 10, 25, 50, 100, and older_than one of 7d, 14d, 30d, 90d."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for path in keys(o.files) : trimspace(path) != "" && !startswith(path, "/") && !startswith(path, "./") && !contains(split("/", path), "..")]]))
+    error_message = "files keys must be relative paths without a leading / or ./ and without .. segments."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for f in values(o.files) : contains(["text", "base64"], f.encoding)]]))
+    error_message = "files[*].encoding must be text or base64."
+  }
+
+  validation {
+    condition     = alltrue([for o in values(var.projects) : o.initialize_with_readme || (length(o.files) == 0 && length(o.kubernetes_agents) == 0)])
+    error_message = "projects[*].files and kubernetes_agents need initialize_with_readme = true (a default branch to commit to)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for name in keys(o.kubernetes_agents) : can(regex("^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$", name))]]))
+    error_message = "kubernetes_agents keys must be DNS labels: lowercase letters, digits and -, at most 63 characters."
+  }
+
+  validation {
+    condition = alltrue(flatten([for o in values(var.projects) : [
+      for a in values(o.kubernetes_agents) : concat(
+        [for g in a.ci_access.groups : contains(keys(var.groups), g)],
+        [for p in a.ci_access.projects : contains(keys(var.projects), p)],
+      )
+    ]]))
+    error_message = "kubernetes_agents[*].ci_access groups and projects must be keys of groups and projects."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for name in keys(o.kubernetes_agents) : !contains(keys(o.files), ".gitlab/agents/${name}/config.yaml")]]))
+    error_message = "files keys must not use .gitlab/agents/<name>/config.yaml for a declared kubernetes_agents entry (the module writes it)."
   }
 }

@@ -336,6 +336,42 @@ locals {
     }
   ]...)
 
+  kubernetes_agents = merge([
+    for pk, pr in var.projects : {
+      for name, a in pr.kubernetes_agents : "${pk}:${name}" => { project = local.project_ids[pk], name = name }
+    }
+  ]...)
+
+  # Files committed to created projects, keyed "<project key>:<path>": the
+  # caller's files, plus the managed config.yaml of each agent with ci_access,
+  # listing the authorised groups and projects by full path.
+  repository_files = merge(concat(
+    [
+      for pk, pr in var.projects : {
+        for path, f in pr.files : "${pk}:${path}" => merge(f, { project_key = pk, file_path = path })
+      }
+    ],
+    [
+      for pk, pr in var.projects : {
+        for name, a in pr.kubernetes_agents : "${pk}:.gitlab/agents/${name}/config.yaml" => {
+          project_key = pk
+          file_path   = ".gitlab/agents/${name}/config.yaml"
+          managed     = true
+          encoding    = "text"
+          executable  = false
+          content = yamlencode({
+            ci_access = {
+              for kind, ids in {
+                groups   = sort(concat([for g in a.ci_access.groups : local.created_groups[g].full_path], tolist(a.ci_access.group_paths)))
+                projects = sort(concat([for p in a.ci_access.projects : gitlab_project.this[p].path_with_namespace], tolist(a.ci_access.project_paths)))
+              } : kind => [for id in ids : { id = id }] if length(ids) > 0
+            }
+          })
+        } if length(a.ci_access.groups) + length(a.ci_access.group_paths) + length(a.ci_access.projects) + length(a.ci_access.project_paths) > 0
+      }
+    ],
+  )...)
+
   project_environments = merge([
     for pk, pr in var.projects : {
       for name, e in pr.environments : "${pk}:${name}" => merge(e, { project = local.project_ids[pk], name = name })

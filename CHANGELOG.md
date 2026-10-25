@@ -9,6 +9,8 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ### Added
 
+- `projects[*].files` commits files to the default branch, before the module creates other branches. A file is managed (the default: Terraform owns it and reverts edits) or seeded with `managed = false` (committed once, then owned by the developers).
+- `projects[*].kubernetes_agents` registers GitLab agents for Kubernetes, each with a token (new sensitive output `kubernetes_agent_tokens`). Its `ci_access` (created groups and projects by key, existing ones by full path) is written to the agent's managed `.gitlab/agents/<name>/config.yaml`.
 - Registry protection on created projects:
   - `package_protection_rules` (push by maintainers by default);
   - `container_protection_rules`, whose `path_pattern` is appended to the project's full path;

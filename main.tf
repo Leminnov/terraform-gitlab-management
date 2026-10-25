@@ -15,10 +15,13 @@
 #               gitlab_user_runner, gitlab_project_environment,
 #               gitlab_pipeline_trigger, gitlab_project_job_token_scopes,
 #               gitlab_project_freeze_period, gitlab_project_secure_file,
-#               gitlab_project_cicd_catalog, gitlab_project_runner_enablement
+#               gitlab_project_cicd_catalog, gitlab_project_runner_enablement,
+#               gitlab_cluster_agent, gitlab_cluster_agent_token
 #   registry.tf gitlab_project_package_protection_rule,
 #               gitlab_project_container_repository_protection,
 #               gitlab_project_container_tag_protection
+#   files.tf    gitlab_repository_file.managed and .seeded (with the agents'
+#               config.yaml)
 #   metadata.tf gitlab_group_label, gitlab_project_label, gitlab_group_badge,
 #               gitlab_project_badge, gitlab_project_hook
 #   premium.tf  gitlab_project_approval_rule, gitlab_project_level_mr_approvals,

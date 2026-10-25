@@ -148,6 +148,12 @@ output "gitlab_runner_tokens" {
   sensitive   = true
 }
 
+output "kubernetes_agent_tokens" {
+  description = "Kubernetes agent tokens keyed \"<project key>:<agent name>\", for installing the agent in the cluster. Sensitive."
+  value       = { for k, t in gitlab_cluster_agent_token.this : k => t.token }
+  sensitive   = true
+}
+
 output "pipeline_trigger_tokens" {
   description = "Pipeline trigger tokens keyed \"<project key>:<description>\", for triggering the project's pipelines through the API. Sensitive."
   value       = { for k, v in gitlab_pipeline_trigger.this : k => v.token }
