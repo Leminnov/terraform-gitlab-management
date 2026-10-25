@@ -30,6 +30,11 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
   Each account has `tokens` with `scopes` (administrator scopes rejected) and exactly one of `expires_at` or `rotation_configuration`. Accounts get access through `members[*].service_account`, checked at plan against GitLab's invitation scope; `members[*].user_id` becomes optional. New outputs `service_accounts` and `service_account_tokens` (sensitive). Dated and rotating tokens live in separate resource blocks, because provider 19.5 crashes validating an unknown `rotation_configuration`.
 
+### Fixed
+
+- A project runner shared with another project through `enabled_runners` was recreated on every plan. Provider 19.5 reads its `project_id` back as the other project once that project has the lower ID, so the module now ignores changes to a runner's `project_id`. To move a standalone runner to another project, change its key or apply `-replace`.
+
+
 ## [13.0.0] - 2026-10-23
 
 ### Changed (breaking)

@@ -66,6 +66,16 @@ resource "gitlab_user_runner" "this" {
   paused          = each.value.paused
   untagged        = each.value.untagged
   locked          = each.value.locked
+
+  # DEVIATION(terraform-code-style): ignore_changes on an attribute the module
+  # owns. Provider 19.5 reads project_id back as the first project gitlab.com
+  # lists for the runner, which after gitlab_project_runner_enablement can be
+  # another project, and project_id forces replacement. A nested runner's
+  # project is part of its key, so project_id never legitimately changes; to
+  # move a standalone runner, change its key or apply -replace.
+  lifecycle {
+    ignore_changes = [project_id]
+  }
 }
 
 resource "gitlab_project_environment" "this" {

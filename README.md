@@ -201,7 +201,8 @@ Back up the state, then follow the "Changed (breaking)" and "Removed" upgrade no
 13. Turning `ci.hardening_enabled` (or an explicit CI setting) off stops sending the value but does not revert it: GitLab keeps the last value applied.
 14. Fine-grained CI/CD job token permissions (GitLab 18.3) are not available: provider 19.5 has no argument for them, and the module calls no API.
 15. Subgroup and project service accounts need GitLab 18 or later. Top-level service accounts use the same resource as subgroup ones but are unit-tested only, so that the tests never create accounts in an organisation's top-level group. Provider 19.5 crashes validating a service-account token with an unknown `rotation_configuration`, so dated and rotating tokens live in separate resource blocks: switching a token between the two re-issues it.
-16. Only OpenTofu is tested; HashiCorp Terraform >= 1.11 is expected to work but is not part of CI.
+16. A runner's `project_id` is not updated in place: provider 19.5 reads it back wrongly once the runner is enabled in another project, so the module ignores its changes. To move a standalone runner to another project, give it a new key or apply `-replace`.
+17. Only OpenTofu is tested; HashiCorp Terraform >= 1.11 is expected to work but is not part of CI.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
