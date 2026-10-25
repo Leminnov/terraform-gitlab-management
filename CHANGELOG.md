@@ -7,6 +7,8 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+## [13.1.0] - 2026-10-25
+
 ### Added
 
 - Plan-time warnings `public_jobs` (explicit `ci.public_jobs = true`) and `job_token_push` (`ci.push_repository_for_job_token_allowed = true`). `token_lifetime` also covers service-account tokens and any `rotation_configuration` whose `expiration_days` is above 366.
