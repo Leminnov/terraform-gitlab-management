@@ -7,6 +7,15 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+### Added
+
+- Service accounts (GitLab 18+, Free tier included) at three levels:
+  - `service_accounts`, in an existing top-level group or intermediate subgroup;
+  - `groups[*].service_accounts`, in a created subgroup;
+  - `projects[*].service_accounts`, in a created project.
+
+  Each account has `tokens` with `scopes` (administrator scopes rejected) and exactly one of `expires_at` or `rotation_configuration`. Accounts get access through `members[*].service_account`, checked at plan against GitLab's invitation scope; `members[*].user_id` becomes optional. New outputs `service_accounts` and `service_account_tokens` (sensitive). Dated and rotating tokens live in separate resource blocks, because provider 19.5 crashes validating an unknown `rotation_configuration`.
+
 ## [13.0.0] - 2026-10-23
 
 ### Changed (breaking)

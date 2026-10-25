@@ -31,6 +31,14 @@ locals {
   # Who may push, merge or create tags on a protected branch or tag.
   protection_access_levels = ["no one", "developer", "maintainer", "admin"]
 
+  # Personal access token scopes a service account token may take: the
+  # administrator scopes sudo and admin_mode are left out.
+  service_account_token_scopes = [
+    "api", "read_user", "read_api", "read_repository", "write_repository",
+    "read_registry", "write_registry", "read_virtual_registry", "write_virtual_registry",
+    "create_runner", "manage_runner", "ai_features", "self_rotate", "read_service_ping",
+  ]
+
   deploy_token_scopes = [
     "read_repository", "read_registry", "write_registry",
     "read_package_registry", "write_package_registry",
@@ -458,6 +466,64 @@ variable "gitlab_project_access_token" {
   }
 }
 
+variable "service_accounts" {
+  description = <<-EOT
+    Service accounts created in existing groups, top-level or intermediate (GitLab 18+, Free tier included), keyed by name. A top-level account can be invited anywhere; a subgroup account only within that subgroup. Grant access through members[*].service_account. Fields:
+      - group    : ID or full path of the existing group to create the account in.
+      - name     : Display name; default the key.
+      - username : Username; null lets GitLab generate one.
+      - email    : Email; null lets GitLab generate one. A custom address needs confirmation unless the group has a matching verified domain.
+      - tokens   : Personal access tokens of the account keyed by name: scopes (api, read_user, read_api, read_repository, write_repository, read_registry, write_registry, read_virtual_registry, write_virtual_registry, create_runner, manage_runner, ai_features, self_rotate, read_service_ping) and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by the first apply within rotate_before_days of expiry). Tokens are stored in state (SECURITY.md).
+  EOT
+  type = map(object({
+    group    = string
+    name     = optional(string)
+    username = optional(string)
+    email    = optional(string)
+    tokens = optional(map(object({
+      scopes     = list(string)
+      expires_at = optional(string)
+      rotation_configuration = optional(object({
+        expiration_days    = number
+        rotate_before_days = number
+      }))
+    })), {})
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for sa in values(var.service_accounts) : trimspace(sa.group) != ""])
+    error_message = "service_accounts[*].group must be a non-empty group ID or full path."
+  }
+
+  validation {
+    condition     = alltrue([for k in keys(var.service_accounts) : !strcontains(k, ":")])
+    error_message = "service_accounts keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in values(var.service_accounts) : [for t in values(sa.tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.service_account_token_scopes, sc)])]]))
+    error_message = "service_accounts[*].tokens[*].scopes must be non-empty, each one of: ${join(", ", local.service_account_token_scopes)}."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([for sa in values(var.service_accounts) : [
+      for t in values(sa.tokens) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]]))
+    error_message = "service_accounts[*].tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in values(var.service_accounts) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
+    error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Group and project tree created under parent_group_id
 # -----------------------------------------------------------------------------
@@ -489,7 +555,8 @@ variable "groups" {
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
-      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - members       : Memberships keyed by any label: exactly one of user_id (an existing user) or service_account (a service account key: a service_accounts key, "<group key>:<name>" of this group or a created ancestor, or on a project "<project key>:<name>" of the project itself), access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - service_accounts : Service accounts created in this group or project, keyed by name: name (display name; default the key), username and email (null: GitLab generates them), tokens keyed by name with scopes and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days }. They reach nothing until granted through members.
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
       - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600; null: no runner limit).
       - labels        : Labels keyed by name: color (#RRGGBB or a CSS colour name), description.
@@ -524,9 +591,23 @@ variable "groups" {
       scopes       = list(string)
     })), {})
     members = optional(map(object({
-      user_id      = number
-      access_level = string
-      expires_at   = optional(string)
+      user_id         = optional(number)
+      service_account = optional(string)
+      access_level    = string
+      expires_at      = optional(string)
+    })), {})
+    service_accounts = optional(map(object({
+      name     = optional(string)
+      username = optional(string)
+      email    = optional(string)
+      tokens = optional(map(object({
+        scopes     = list(string)
+        expires_at = optional(string)
+        rotation_configuration = optional(object({
+          expiration_days    = number
+          rotate_before_days = number
+        }))
+      })), {})
     })), {})
     shared_with = optional(map(object({
       group        = optional(string)
@@ -722,6 +803,47 @@ variable "groups" {
     condition     = alltrue(flatten([for o in values(var.groups) : [for h in values(o.hooks) : h.signing_token == null || can(regex("^whsec_[A-Za-z0-9+/]{43}=$", coalesce(h.signing_token, "-")))]]))
     error_message = "hooks[*].signing_token must be whsec_ followed by the base64 of a 32-byte key."
   }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for m in values(o.members) : (m.user_id == null) != (m.service_account == null)]]))
+    error_message = "members[*] must set exactly one of user_id or service_account."
+  }
+
+  validation {
+    # A subgroup service account can be invited only within that subgroup.
+    condition = alltrue(flatten([
+      for gk, o in var.groups : [
+        for m in values(o.members) : m.service_account == null ? true : (
+          contains(keys(var.service_accounts), coalesce(m.service_account, "-")) || anytrue(flatten([
+            for g2, o2 in var.groups : [for n in keys(o2.service_accounts) : "${g2}:${n}" == m.service_account && (gk == g2 || startswith(gk, "${g2}/"))]
+          ]))
+        )
+      ]
+    ]))
+    error_message = "members[*].service_account must be a service_accounts key, a service account of this group or of a created ancestor group, or one of this project's own service accounts."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [for t in values(sa.tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.service_account_token_scopes, sc)])]]))
+    error_message = "service_accounts[*].tokens[*].scopes must be non-empty, each one of: ${join(", ", local.service_account_token_scopes)}."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [
+      for t in values(sa.tokens) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]]))
+    error_message = "service_accounts[*].tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
+    error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
 }
 
 variable "projects" {
@@ -746,7 +868,8 @@ variable "projects" {
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
-      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - members       : Memberships keyed by any label: exactly one of user_id (an existing user) or service_account (a service account key: a service_accounts key, "<group key>:<name>" of this group or a created ancestor, or on a project "<project key>:<name>" of the project itself), access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - service_accounts : Service accounts created in this group or project, keyed by name: name (display name; default the key), username and email (null: GitLab generates them), tokens keyed by name with scopes and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days }. They reach nothing until granted through members.
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
       - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600; null: no runner limit).
       - deploy_keys         : SSH deploy keys keyed by title: key (OpenSSH public key), expires_at (required, RFC 3339), can_push (default false).
@@ -806,9 +929,23 @@ variable "projects" {
       scopes       = list(string)
     })), {})
     members = optional(map(object({
-      user_id      = number
-      access_level = string
-      expires_at   = optional(string)
+      user_id         = optional(number)
+      service_account = optional(string)
+      access_level    = string
+      expires_at      = optional(string)
+    })), {})
+    service_accounts = optional(map(object({
+      name     = optional(string)
+      username = optional(string)
+      email    = optional(string)
+      tokens = optional(map(object({
+        scopes     = list(string)
+        expires_at = optional(string)
+        rotation_configuration = optional(object({
+          expiration_days    = number
+          rotate_before_days = number
+        }))
+      })), {})
     })), {})
     shared_with = optional(map(object({
       group        = optional(string)
@@ -1123,5 +1260,51 @@ variable "projects" {
   validation {
     condition     = alltrue(flatten([for o in values(var.projects) : [for e in values(o.protected_environments) : contains(["developer", "maintainer"], e.deploy_access_level) && (e.required_approvals == null || coalesce(e.required_approvals, 0) >= 0)]]))
     error_message = "protected_environments[*].deploy_access_level must be developer or maintainer, and required_approvals null or >= 0."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for m in values(o.members) : (m.user_id == null) != (m.service_account == null)]]))
+    error_message = "members[*] must set exactly one of user_id or service_account."
+  }
+
+  validation {
+    # ns binds the project's group key; a project service account can be
+    # invited only to its own project.
+    condition = alltrue(flatten([
+      for pk, o in var.projects : [
+        for ns in [join("/", slice(split("/", pk), 0, length(split("/", pk)) - 1))] : [
+          for m in values(o.members) : m.service_account == null ? true : (
+            contains(keys(var.service_accounts), coalesce(m.service_account, "-")) ||
+            contains([for n in keys(o.service_accounts) : "${pk}:${n}"], coalesce(m.service_account, "-")) ||
+            anytrue(flatten([
+              for g2, o2 in var.groups : [for n in keys(o2.service_accounts) : "${g2}:${n}" == m.service_account && ns != "" && (ns == g2 || startswith(ns, "${g2}/"))]
+            ]))
+          )
+        ]
+      ]
+    ]))
+    error_message = "members[*].service_account must be a service_accounts key, a service account of this group or of a created ancestor group, or one of this project's own service accounts."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [for t in values(sa.tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.service_account_token_scopes, sc)])]]))
+    error_message = "service_accounts[*].tokens[*].scopes must be non-empty, each one of: ${join(", ", local.service_account_token_scopes)}."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [
+      for t in values(sa.tokens) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]]))
+    error_message = "service_accounts[*].tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
+    error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
 }

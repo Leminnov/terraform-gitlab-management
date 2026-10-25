@@ -65,7 +65,15 @@ module "gitlab_management" {
       deploy_tokens = { pull = { expires_at = "${var.token_expires_at}T00:00:00Z", scopes = ["read_repository"] } }
       deploy_keys   = { gitops = { key = var.deploy_key, expires_at = "${var.token_expires_at}T00:00:00Z" } }
       environments  = { production = { tier = "production" } }
-      members       = { reviewer = { user_id = var.reviewer_user_id, access_level = "reporter", expires_at = var.token_expires_at } }
+      members = {
+        reviewer = { user_id = var.reviewer_user_id, access_level = "reporter", expires_at = var.token_expires_at }
+        release  = { service_account = "platform/backend/api:release", access_level = "developer" }
+      }
+
+      # A project service account (Free tier) with a token rotated by apply.
+      service_accounts = {
+        release = { tokens = { ci = { scopes = ["write_repository"], rotation_configuration = { expiration_days = 90, rotate_before_days = 14 } } } }
+      }
     }
   }
 

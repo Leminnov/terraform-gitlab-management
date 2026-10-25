@@ -8,6 +8,8 @@
 #               gitlab_deploy_key, gitlab_group_membership,
 #               gitlab_project_membership, gitlab_group_share_group,
 #               gitlab_project_share_group
+#   service_accounts.tf gitlab_group_service_account,
+#               gitlab_project_service_account and their access tokens
 #   ci.tf       gitlab_group_variable, gitlab_project_variable,
 #               gitlab_pipeline_schedule, gitlab_pipeline_schedule_variable,
 #               gitlab_user_runner, gitlab_project_environment,

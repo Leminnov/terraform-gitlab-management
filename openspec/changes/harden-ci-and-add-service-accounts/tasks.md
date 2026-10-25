@@ -2,7 +2,7 @@
 
 ## 1. Service accounts and memberships (design 1)
 
-- [ ] 1.1 `variables.tf`:
+- [x] 1.1 `variables.tf`:
   - the standalone `service_accounts` input (`group`, `name`, `username`, `email`, `tokens`);
   - `service_accounts` on the `groups` and `projects` objects;
   - `members[*].user_id` optional, plus `members[*].service_account`;
@@ -14,13 +14,13 @@
     - invitation scope (`groups` reads only `var.service_accounts`).
 
   Verify `tofu validate`.
-- [ ] 1.2 `service_accounts.tf` and `locals.tf`:
+- [x] 1.2 `service_accounts.tf` and `locals.tf`:
   - `gitlab_group_service_account.this` (standalone and nested groups) and `gitlab_project_service_account.this`, both with `skip_wait_for_deletion = true`;
   - the two token resources keyed `"<account key>:<token>"`;
   - memberships resolving `service_account` to `service_account_id`.
 
   `outputs.tf`: `service_accounts` and the sensitive `service_account_tokens`. `main.tf`: header lists `service_accounts.tf`. Verify `tofu validate` and `tflint --recursive`.
-- [ ] 1.3 `tests/service_accounts.tftest.hcl` with mock IDs:
+- [x] 1.3 `tests/service_accounts.tftest.hcl` with mock IDs:
   - keys at the three levels;
   - display name default;
   - rotation sending no `expires_at`;
@@ -29,7 +29,7 @@
   - one rejected-input run per new validation, valid in every other respect.
 
   Verify `mise run test` and the mutation check: deleting each new validation fails the suite.
-- [ ] 1.4 `SECURITY.md`:
+- [x] 1.4 `SECURITY.md`:
   - rows for service-account tokens in state;
   - the rotation entry (rotate with a top-level group Owner token on gitlab.com);
   - least-privilege note on scoping bots by membership.

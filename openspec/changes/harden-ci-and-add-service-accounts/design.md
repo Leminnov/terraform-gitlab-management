@@ -54,6 +54,11 @@
   - `name` defaults to the item name;
   - `username` and `email` are sent only when set (both are Optional+Computed, so null reads back without diff);
   - `skip_wait_for_deletion = true`, because gitlab.com deletes users asynchronously and destroy would otherwise block until the timeout.
+- **Two blocks per token type:**
+  - `this` holds dated tokens; `rotating` holds tokens with `rotation_configuration`, built from an object literal.
+  - Reason: provider 19.5's `ValidateConfig` on service-account tokens dereferences a nil set (a crash) when `rotation_configuration` is unknown. `tofu validate` sees every `for_each` value as unknown, so one block passing `each.value.rotation_configuration` can never validate.
+  - Cost: switching a token between the two forms moves it between blocks, so it is re-issued, which a change of expiry already does.
+  - Access tokens have no `ValidateConfig` and keep one block.
 - **Access:** through `members[*].service_account`. The membership resources take `user_id = <account>.service_account_id`, unknown until apply, which `for_each` allows because the keys are static.
 - **Invitation scope:** GitLab's rule is checked at plan from the keys alone:
   - a group account `"G:n"` is valid on group G, on its descendants (key equal to G or starting with `G/`) and on their projects;
@@ -190,6 +195,7 @@
 - [Commits to a default branch whose protection allows no push, or that Premium push rules such as `reject_unsigned_commits` block, fail at apply] → Known limitation in the README; the default protections allow maintainers.
 - [Each file is one commit, and a `.gitlab-ci.yml` among them starts pipelines] → Documented. Seeded files keep later commits out of Terraform.
 - [Secure files are text only] → Documented limitation.
+- [Provider crash on an unknown service-account token rotation] → Two blocks (decision 1). Once the provider is fixed, a later release can merge them with `moved` blocks.
 - [Top-level service accounts are not exercised against GitLab] → Same resource and arguments as the subgroup case, which is exercised. Unit-tested and documented as such.
 
 ## Migration Plan

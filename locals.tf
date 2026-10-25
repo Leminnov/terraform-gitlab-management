@@ -199,15 +199,61 @@ locals {
     }
   ]...)
 
+  # Service accounts: standalone ones in an existing group keyed "<name>",
+  # those of created groups and projects keyed "<owner key>:<name>".
+  group_service_accounts = merge(
+    { for k, sa in var.service_accounts : k => { group = sa.group, name = coalesce(sa.name, k), username = sa.username, email = sa.email } },
+    merge([
+      for gk, g in var.groups : {
+        for n, sa in g.service_accounts : "${gk}:${n}" => { group = local.group_ids[gk], name = coalesce(sa.name, n), username = sa.username, email = sa.email }
+      }
+    ]...),
+  )
+
+  project_service_accounts = merge([
+    for pk, pr in var.projects : {
+      for n, sa in pr.service_accounts : "${pk}:${n}" => { project = local.project_ids[pk], name = coalesce(sa.name, n), username = sa.username, email = sa.email }
+    }
+  ]...)
+
+  # Tokens keyed "<service account key>:<token name>".
+  group_service_account_tokens = merge(concat(
+    [for k, sa in var.service_accounts : { for t, tok in sa.tokens : "${k}:${t}" => merge(tok, { account = k, name = t }) }],
+    flatten([
+      for gk, g in var.groups : [
+        for n, sa in g.service_accounts : { for t, tok in sa.tokens : "${gk}:${n}:${t}" => merge(tok, { account = "${gk}:${n}", name = t }) }
+      ]
+    ]),
+  )...)
+
+  project_service_account_tokens = merge(flatten([
+    for pk, pr in var.projects : [
+      for n, sa in pr.service_accounts : { for t, tok in sa.tokens : "${pk}:${n}:${t}" => merge(tok, { account = "${pk}:${n}", name = t }) }
+    ]
+  ])...)
+
+  service_account_user_ids = merge(
+    { for k, sa in gitlab_group_service_account.this : k => tonumber(sa.service_account_id) },
+    { for k, sa in gitlab_project_service_account.this : k => tonumber(sa.service_account_id) },
+  )
+
+  # A member is a user ID or a service account managed here (validated in
+  # variables.tf against GitLab's invitation scope).
   group_memberships = merge([
     for gk, g in var.groups : {
-      for name, m in g.members : "${gk}:${name}" => merge(m, { group_id = tonumber(local.group_ids[gk]) })
+      for name, m in g.members : "${gk}:${name}" => merge(m, {
+        group_id = tonumber(local.group_ids[gk])
+        user_id  = m.service_account == null ? m.user_id : local.service_account_user_ids[m.service_account]
+      })
     }
   ]...)
 
   project_memberships = merge([
     for pk, pr in var.projects : {
-      for name, m in pr.members : "${pk}:${name}" => merge(m, { project = local.project_ids[pk] })
+      for name, m in pr.members : "${pk}:${name}" => merge(m, {
+        project = local.project_ids[pk]
+        user_id = m.service_account == null ? m.user_id : local.service_account_user_ids[m.service_account]
+      })
     }
   ]...)
 
