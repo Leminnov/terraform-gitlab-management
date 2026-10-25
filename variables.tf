@@ -926,6 +926,8 @@ variable "projects" {
       - freeze_periods          : Deploy freezes keyed by label: freeze_start and freeze_end (5-field cron), cron_timezone (default UTC).
       - secure_files            : CI/CD secure files keyed by file name (no /), with their text content. Redacted in plans, stored in state (SECURITY.md).
       - cicd_catalog            : Publish the project as a CI/CD catalog resource; default false. Needs a description.
+      - enabled_runners         : Unlocked project runners of other created projects to enable here, as "<project key>:<runner name>"; enabled_runner_ids for existing runners by ID.
+      - enabled_deploy_keys     : Deploy keys of other created projects to enable here read-only, as "<project key>:<title>"; enabled_deploy_key_ids for existing deploy keys by ID.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
       - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
@@ -1006,6 +1008,11 @@ variable "projects" {
     })), {})
     secure_files = optional(map(string), {})
     cicd_catalog = optional(bool, false)
+    # Sharing with other projects
+    enabled_runners        = optional(set(string), [])
+    enabled_runner_ids     = optional(set(number), [])
+    enabled_deploy_keys    = optional(set(string), [])
+    enabled_deploy_key_ids = optional(set(number), [])
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -1468,5 +1475,27 @@ variable "projects" {
   validation {
     condition     = alltrue([for v in values(var.projects) : !v.cicd_catalog || trimspace(coalesce(v.description, " ")) != ""])
     error_message = "projects[*].cicd_catalog requires a description (GitLab lists catalog projects by it)."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for pk, o in var.projects : [
+        for e in o.enabled_runners : anytrue(flatten([
+          for p2, o2 in var.projects : [for n, r in o2.runners : "${p2}:${n}" == e && p2 != pk && !r.locked]
+        ]))
+      ]
+    ]))
+    error_message = "enabled_runners entries must name an unlocked runner of another created project, as \"<project key>:<runner name>\"."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for pk, o in var.projects : [
+        for e in o.enabled_deploy_keys : anytrue(flatten([
+          for p2, o2 in var.projects : [for t in keys(o2.deploy_keys) : "${p2}:${t}" == e && p2 != pk]
+        ]))
+      ]
+    ]))
+    error_message = "enabled_deploy_keys entries must name a deploy key of another created project, as \"<project key>:<title>\"."
   }
 }

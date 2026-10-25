@@ -9,6 +9,7 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ### Added
 
+- Cross-project sharing: `projects[*].enabled_runners` enables an unlocked project runner of another created project (`"<project key>:<runner name>"`), and `enabled_runner_ids` an existing runner by ID. `enabled_deploy_keys` and `enabled_deploy_key_ids` do the same for deploy keys, always read-only.
 - Opt-in CI hardening on created projects: `projects[*].ci.hardening_enabled` (default `false`, so existing projects do not change). When on, it sends `public_jobs = false`, pipeline variable overrides by no one, protected merge request pipelines, separate caches for protected branches, forward deployment, no job-token pushes and no merge on skipped pipelines. Each of these can also be set on its own, and an explicit value wins.
 - Other CI settings in `projects[*].ci`, each sent only when set: `config_path`, `auto_cancel_pending_pipelines`, `build_timeout`, `default_git_depth`, `delete_pipelines_in_seconds`, `id_token_sub_claim_components` (the OIDC `sub` claim), `group_runners_enabled` and `shared_runners_enabled`. Also `groups[*].shared_runners_setting`.
 - `projects[*].freeze_periods` (deploy freezes), `projects[*].secure_files` (CI/CD secure files, text content, redacted in plans and stored in state) and `projects[*].cicd_catalog`.

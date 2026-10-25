@@ -97,3 +97,13 @@ resource "gitlab_project_share_group" "this" {
   group_access = each.value.access_level
   expires_at   = each.value.expires_at
 }
+
+# Read-only: a writable key shared across projects would be an undeclared
+# write path (check.deploy_key_write_access covers the owning project's key).
+resource "gitlab_deploy_key_enable" "this" {
+  for_each = local.project_deploy_key_enablements
+
+  project  = each.value.project
+  key_id   = each.value.key_id
+  can_push = false
+}

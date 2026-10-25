@@ -302,6 +302,22 @@ locals {
     }
   ]...)
 
+  # Runners and deploy keys of other created projects ("<project key>:<source
+  # key>") or existing ones by ID, enabled in a project.
+  project_runner_enablements = merge(flatten([
+    for pk, pr in var.projects : [
+      { for e in pr.enabled_runners : "${pk}:${e}" => { project = local.project_ids[pk], runner_id = tonumber(gitlab_user_runner.this[e].id) } },
+      { for id in pr.enabled_runner_ids : "${pk}:${id}" => { project = local.project_ids[pk], runner_id = id } },
+    ]
+  ])...)
+
+  project_deploy_key_enablements = merge(flatten([
+    for pk, pr in var.projects : [
+      { for e in pr.enabled_deploy_keys : "${pk}:${e}" => { project = local.project_ids[pk], key_id = tostring(gitlab_deploy_key.this[e].deploy_key_id) } },
+      { for id in pr.enabled_deploy_key_ids : "${pk}:${id}" => { project = local.project_ids[pk], key_id = tostring(id) } },
+    ]
+  ])...)
+
   project_environments = merge([
     for pk, pr in var.projects : {
       for name, e in pr.environments : "${pk}:${name}" => merge(e, { project = local.project_ids[pk], name = name })

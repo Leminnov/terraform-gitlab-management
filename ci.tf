@@ -123,3 +123,10 @@ resource "gitlab_project_cicd_catalog" "this" {
   project = each.value
   enabled = true
 }
+
+resource "gitlab_project_runner_enablement" "this" {
+  for_each = local.project_runner_enablements
+
+  project   = each.value.project
+  runner_id = each.value.runner_id
+}

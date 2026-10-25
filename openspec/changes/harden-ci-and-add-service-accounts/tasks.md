@@ -74,9 +74,9 @@
 
 ## 4. Cross-project runners and deploy keys (design 5)
 
-- [ ] 4.1 `projects[*].enabled_runners` and `enabled_runner_ids`, and `enabled_deploy_keys` and `enabled_deploy_key_ids`, with their validations (unlocked runner of another created project; deploy key of another created project). Add `gitlab_project_runner_enablement.this` to `ci.tf` and `gitlab_deploy_key_enable.this` (`can_push = false`) to `access.tf`. Verify `tofu validate`.
-- [ ] 4.2 Unit runs in `tests/nested.tftest.hcl`: keys `"<pk>:<source key>"` and `"<pk>:<id>"`, the runner ID and deploy key ID resolved, `can_push = false`, and the rejected runs (own runner, locked runner, group runner, unknown key; own deploy key, unknown key). Verify `mise run test` and the mutation check.
-- [ ] 4.3 CHANGELOG Added. Verify `pre-commit run -a`.
+- [x] 4.1 `projects[*].enabled_runners` and `enabled_runner_ids`, and `enabled_deploy_keys` and `enabled_deploy_key_ids`, with their validations (unlocked runner of another created project; deploy key of another created project). Add `gitlab_project_runner_enablement.this` to `ci.tf` and `gitlab_deploy_key_enable.this` (`can_push = false`) to `access.tf`. Verify `tofu validate`.
+- [x] 4.2 Unit runs in `tests/nested.tftest.hcl`: keys `"<pk>:<source key>"` and `"<pk>:<id>"`, the runner ID and deploy key ID resolved, `can_push = false`, and the rejected runs (own runner, locked runner, group runner, unknown key; own deploy key, unknown key). Verify `mise run test` and the mutation check.
+- [x] 4.3 CHANGELOG Added. Verify `pre-commit run -a`.
 
 ## 5. Registry protection (design 6)
 
