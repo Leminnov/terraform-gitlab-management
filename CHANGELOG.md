@@ -9,6 +9,7 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ### Added
 
+- `rotation_configuration = { expiration_days, rotate_before_days }` on group and project access tokens, standalone and nested: the first apply within `rotate_before_days` of expiry rotates the token. `expires_at` becomes optional, and exactly one of the two is required.
 - Service accounts (GitLab 18+, Free tier included) at three levels:
   - `service_accounts`, in an existing top-level group or intermediate subgroup;
   - `groups[*].service_accounts`, in a created subgroup;

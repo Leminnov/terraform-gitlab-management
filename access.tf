@@ -26,6 +26,8 @@ resource "gitlab_group_access_token" "this" {
   expires_at   = each.value.expires_at
   access_level = each.value.access_level
   scopes       = each.value.scopes
+  # Exactly one of expires_at and rotation_configuration is set (variables.tf).
+  rotation_configuration = each.value.rotation_configuration
 }
 
 resource "gitlab_project_access_token" "this" {
@@ -36,6 +38,8 @@ resource "gitlab_project_access_token" "this" {
   expires_at   = each.value.expires_at
   access_level = each.value.access_level
   scopes       = each.value.scopes
+  # Exactly one of expires_at and rotation_configuration is set (variables.tf).
+  rotation_configuration = each.value.rotation_configuration
 }
 
 resource "gitlab_project_deploy_token" "this" {

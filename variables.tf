@@ -357,16 +357,21 @@ variable "gitlab_group_access_token" {
     Map of GitLab group access tokens. Each entry is expanded across its `groups` list. Fields:
       - groups        : Group paths or IDs to create the token in. Must be non-empty.
       - name          : Human-readable token name.
-      - expires_at    : Required expiry date, YYYY-MM-DD, within the instance's maximum token lifetime.
+      - expires_at    : Expiry date, YYYY-MM-DD, within the instance's maximum token lifetime. Exactly one of expires_at or rotation_configuration is required.
+      - rotation_configuration : { expiration_days, rotate_before_days }: the token lives expiration_days and the first apply within rotate_before_days of its expiry rotates it; GitLab then sets expires_at.
       - access_level  : One of no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner; null lets GitLab grant maintainer.
       - scopes        : Token scopes, non-empty: api, read_api, read_registry, write_registry, read_virtual_registry, write_virtual_registry, read_repository, write_repository, create_runner, manage_runner, ai_features, k8s_proxy, read_observability, write_observability, self_rotate.
   EOT
   type = map(object({
     groups       = list(string)
     name         = string
-    expires_at   = string
+    expires_at   = optional(string)
     access_level = optional(string)
     scopes       = list(string)
+    rotation_configuration = optional(object({
+      expiration_days    = number
+      rotate_before_days = number
+    }))
   }))
   default = {}
 
@@ -381,7 +386,7 @@ variable "gitlab_group_access_token" {
   validation {
     condition = alltrue([
       for v in values(var.gitlab_group_access_token) :
-      can(regex(local.day_regex, v.expires_at))
+      v.expires_at == null || can(regex(local.day_regex, v.expires_at))
     ])
     error_message = "gitlab_group_access_token[*].expires_at must be a date in YYYY-MM-DD format."
   }
@@ -407,6 +412,18 @@ variable "gitlab_group_access_token" {
     condition     = alltrue([for k in keys(var.gitlab_group_access_token) : !strcontains(k, ":")])
     error_message = "gitlab_group_access_token keys must not contain \":\" (reserved for objects nested in groups and projects)."
   }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in values(var.gitlab_group_access_token) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "gitlab_group_access_token[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
 }
 
 variable "gitlab_project_access_token" {
@@ -414,16 +431,21 @@ variable "gitlab_project_access_token" {
     Map of GitLab project access tokens. Each entry is expanded across its `projects` list. Fields:
       - projects      : Project paths or IDs to create the token in. Must be non-empty.
       - name          : Human-readable token name.
-      - expires_at    : Required expiry date, YYYY-MM-DD, within the instance's maximum token lifetime.
+      - expires_at    : Expiry date, YYYY-MM-DD, within the instance's maximum token lifetime. Exactly one of expires_at or rotation_configuration is required.
+      - rotation_configuration : { expiration_days, rotate_before_days }: the token lives expiration_days and the first apply within rotate_before_days of its expiry rotates it; GitLab then sets expires_at.
       - access_level  : One of no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner; null lets GitLab grant maintainer.
       - scopes        : Token scopes, non-empty: api, read_api, read_registry, write_registry, read_repository, write_repository, create_runner, manage_runner, ai_features, k8s_proxy, read_observability, write_observability, self_rotate.
   EOT
   type = map(object({
     projects     = list(string)
     name         = string
-    expires_at   = string
+    expires_at   = optional(string)
     access_level = optional(string)
     scopes       = list(string)
+    rotation_configuration = optional(object({
+      expiration_days    = number
+      rotate_before_days = number
+    }))
   }))
   default = {}
 
@@ -438,7 +460,7 @@ variable "gitlab_project_access_token" {
   validation {
     condition = alltrue([
       for v in values(var.gitlab_project_access_token) :
-      can(regex(local.day_regex, v.expires_at))
+      v.expires_at == null || can(regex(local.day_regex, v.expires_at))
     ])
     error_message = "gitlab_project_access_token[*].expires_at must be a date in YYYY-MM-DD format."
   }
@@ -463,6 +485,18 @@ variable "gitlab_project_access_token" {
   validation {
     condition     = alltrue([for k in keys(var.gitlab_project_access_token) : !strcontains(k, ":")])
     error_message = "gitlab_project_access_token keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in values(var.gitlab_project_access_token) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "gitlab_project_access_token[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
   }
 }
 
@@ -554,7 +588,7 @@ variable "groups" {
       - permanently_remove_on_delete      : With archive_on_destroy = false, remove the group at once instead of scheduling the deletion; default false.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
-      - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
+      - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
       - members       : Memberships keyed by any label: exactly one of user_id (an existing user) or service_account (a service account key: a service_accounts key, "<group key>:<name>" of this group or a created ancestor, or on a project "<project key>:<name>" of the project itself), access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
       - service_accounts : Service accounts created in this group or project, keyed by name: name (display name; default the key), username and email (null: GitLab generates them), tokens keyed by name with scopes and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days }. They reach nothing until granted through members.
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
@@ -586,9 +620,13 @@ variable "groups" {
       scopes     = list(string)
     })), {})
     access_tokens = optional(map(object({
-      expires_at   = string
+      expires_at   = optional(string)
       access_level = optional(string)
       scopes       = list(string)
+      rotation_configuration = optional(object({
+        expiration_days    = number
+        rotate_before_days = number
+      }))
     })), {})
     members = optional(map(object({
       user_id         = optional(number)
@@ -734,7 +772,7 @@ variable "groups" {
   }
 
   validation {
-    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : can(regex(local.day_regex, t.expires_at))]]))
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : t.expires_at == null || can(regex(local.day_regex, t.expires_at))]]))
     error_message = "access_tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
 
@@ -844,6 +882,18 @@ variable "groups" {
     condition     = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
     error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in flatten([for o in values(var.groups) : values(o.access_tokens)]) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "access_tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
 }
 
 variable "projects" {
@@ -867,7 +917,7 @@ variable "projects" {
       - permanently_delete_on_destroy : With archive_on_destroy = false, delete the project at once instead of scheduling the deletion; default false.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
-      - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
+      - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
       - members       : Memberships keyed by any label: exactly one of user_id (an existing user) or service_account (a service account key: a service_accounts key, "<group key>:<name>" of this group or a created ancestor, or on a project "<project key>:<name>" of the project itself), access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
       - service_accounts : Service accounts created in this group or project, keyed by name: name (display name; default the key), username and email (null: GitLab generates them), tokens keyed by name with scopes and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days }. They reach nothing until granted through members.
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
@@ -924,9 +974,13 @@ variable "projects" {
       scopes     = list(string)
     })), {})
     access_tokens = optional(map(object({
-      expires_at   = string
+      expires_at   = optional(string)
       access_level = optional(string)
       scopes       = list(string)
+      rotation_configuration = optional(object({
+        expiration_days    = number
+        rotate_before_days = number
+      }))
     })), {})
     members = optional(map(object({
       user_id         = optional(number)
@@ -1133,7 +1187,7 @@ variable "projects" {
   }
 
   validation {
-    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : can(regex(local.day_regex, t.expires_at))]]))
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : t.expires_at == null || can(regex(local.day_regex, t.expires_at))]]))
     error_message = "access_tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
 
@@ -1306,5 +1360,17 @@ variable "projects" {
   validation {
     condition     = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
     error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in flatten([for o in values(var.projects) : values(o.access_tokens)]) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "access_tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
   }
 }

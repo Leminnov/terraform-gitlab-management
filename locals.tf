@@ -61,6 +61,8 @@ locals {
         expires_at   = v.expires_at
         access_level = v.access_level
         scopes       = v.scopes
+        # Rotated tokens get their expiry from GitLab.
+        rotation_configuration = v.rotation_configuration
       }
     }
     ], [
@@ -77,6 +79,8 @@ locals {
         expires_at   = v.expires_at
         access_level = v.access_level
         scopes       = v.scopes
+        # Rotated tokens get their expiry from GitLab.
+        rotation_configuration = v.rotation_configuration
       }
     }
     ], [

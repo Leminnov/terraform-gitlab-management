@@ -38,15 +38,15 @@
 
 ## 2. Token rotation on access tokens (design 2)
 
-- [ ] 2.1 `gitlab_group_access_token` and `gitlab_project_access_token` inputs and the nested `access_tokens`:
+- [x] 2.1 `gitlab_group_access_token` and `gitlab_project_access_token` inputs and the nested `access_tokens`:
   - `expires_at` optional plus `rotation_configuration`;
   - the exactly-one validation per input;
   - the date-format validations accept null;
   - `access.tf` sends `rotation_configuration` and `expires_at = null` when rotating.
 
   Verify `tofu validate`.
-- [ ] 2.2 Unit runs in `tests/main.tftest.hcl` (standalone) and `tests/nested.tftest.hcl` (nested): a rotating token plans with the configuration, and one rejected run each for neither, both, and a window equal to the lifetime. Verify `mise run test` and the mutation check.
-- [ ] 2.3 README input notes unchanged (terraform-docs regenerates them). CHANGELOG Added: rotation. Verify `pre-commit run -a` leaves the README stable.
+- [x] 2.2 Unit runs in `tests/main.tftest.hcl` (standalone) and `tests/nested.tftest.hcl` (nested): a rotating token plans with the configuration, and one rejected run each for neither, both, and a window equal to the lifetime. Verify `mise run test` and the mutation check.
+- [x] 2.3 README input notes unchanged (terraform-docs regenerates them). CHANGELOG Added: rotation. Verify `pre-commit run -a` leaves the README stable.
 
 ## 3. Hardened CI settings, freeze periods, secure files, catalog (design 3, 4)
 

@@ -1296,3 +1296,73 @@ run "gitlab_project_access_token_key_with_colon_is_rejected" {
     var.gitlab_project_access_token,
   ]
 }
+
+# ---------------------------------------------------------------------------
+# Token rotation (access-tokens spec): rotation_configuration instead of
+# expires_at, exactly one of the two.
+# ---------------------------------------------------------------------------
+
+run "rotating_access_tokens" {
+  command = plan
+
+  variables {
+    gitlab_group_access_token = {
+      bot = { groups = ["org/a"], name = "bot", access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 90, rotate_before_days = 14 } }
+    }
+    gitlab_project_access_token = {
+      bot = { projects = ["org/app"], name = "bot", access_level = "developer", scopes = ["read_api"], expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "720h")) }
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      gitlab_group_access_token.this["bot_org/a"].rotation_configuration.expiration_days == 90,
+      gitlab_group_access_token.this["bot_org/a"].rotation_configuration.rotate_before_days == 14,
+      local.group_access_tokens["bot_org/a"].expires_at == null,
+      gitlab_project_access_token.this["bot_org/app"].rotation_configuration == null,
+    ])
+    error_message = "A rotating token must send its rotation and no expiry; a dated token no rotation."
+  }
+}
+
+run "group_token_without_expiry_or_rotation_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_group_access_token = {
+      bot = { groups = ["org/a"], name = "bot", access_level = "developer", scopes = ["read_api"] }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_group_access_token,
+  ]
+}
+
+run "project_token_with_expiry_and_rotation_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_project_access_token = {
+      bot = { projects = ["org/app"], name = "bot", access_level = "developer", scopes = ["read_api"], expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "720h")), rotation_configuration = { expiration_days = 90, rotate_before_days = 14 } }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_project_access_token,
+  ]
+}
+
+run "project_token_rotation_window_as_long_as_lifetime_is_rejected" {
+  command = plan
+
+  variables {
+    gitlab_project_access_token = {
+      bot = { projects = ["org/app"], name = "bot", access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 30, rotate_before_days = 30 } }
+    }
+  }
+
+  expect_failures = [
+    var.gitlab_project_access_token,
+  ]
+}

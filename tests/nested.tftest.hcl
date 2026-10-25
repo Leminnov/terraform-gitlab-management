@@ -629,3 +629,48 @@ run "project_job_token_unknown_project_is_rejected" {
     var.projects,
   ]
 }
+
+# ---------------------------------------------------------------------------
+# Rotation of nested access tokens (access-tokens spec)
+# ---------------------------------------------------------------------------
+
+run "nested_rotating_access_token" {
+  command = plan
+
+  variables {
+    projects = {
+      "platform/api" = {
+        access_tokens = { bot = { access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 60, rotate_before_days = 7 } } }
+      }
+    }
+  }
+
+  assert {
+    condition     = gitlab_project_access_token.this["platform/api:bot"].rotation_configuration.expiration_days == 60 && local.project_access_tokens["platform/api:bot"].expires_at == null
+    error_message = "A nested rotating token must send its rotation and no expiry."
+  }
+}
+
+run "group_nested_token_without_expiry_or_rotation_is_rejected" {
+  command = plan
+
+  variables {
+    groups = { platform = { access_tokens = { bot = { access_level = "developer", scopes = ["read_api"] } } }, teams = {} }
+  }
+
+  expect_failures = [
+    var.groups,
+  ]
+}
+
+run "project_nested_token_rotation_window_as_long_as_lifetime_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = { access_tokens = { bot = { access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 30, rotate_before_days = 30 } } } } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
