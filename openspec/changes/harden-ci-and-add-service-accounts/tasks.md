@@ -131,7 +131,7 @@
 
 ## 10. Project instructions (AGENTS.md, OpenSpec config)
 
-- [ ] 10.1 `AGENTS.md` and `openspec/config.yaml`: the three new themed files, the 20 capability directories, service-account keys and scope, and opt-in CI hardening. Verify `mise run spec-validate` and that `openspec instructions specs --change harden-ci-and-add-service-accounts --json` shows the new context.
+- [x] 10.1 `AGENTS.md` and `openspec/config.yaml`: the three new themed files, the 20 capability directories, service-account keys and scope, and opt-in CI hardening. Verify `mise run spec-validate` and that `openspec instructions specs --change harden-ci-and-add-service-accounts --json` shows the new context.
 
 ## 11. Integration checks and delivery
 
