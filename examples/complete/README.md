@@ -5,7 +5,11 @@ Exercises every input of the module with settings that raise no guardrail warnin
 ## What this example does
 
 - Creates the groups `platform` and `platform/backend` under the demo group, and the projects `platform/docs` and `platform/backend/api`, with the module defaults: private, `main` initialised and protected for maintainers, `develop` created and protected for developers, `v*` tags protected, merges only on a green pipeline with threads resolved.
+- Hardens the CI/CD settings of `platform/docs` (`ci.hardening_enabled`), keeps its pipelines 90 days and freezes deployments every weekend.
 - Gives `platform` a `bug` label and a pipeline badge that every project in it shows.
+- Commits a Terraform-owned `CODEOWNERS` and a seeded `.gitlab-ci.yml` to `platform/backend/api`, and registers the Kubernetes agent `prod`, reachable from the pipelines of the `platform` group.
+- Protects the npm packages `@my-org/*` and the `v*` container tags of `platform/backend/api`, pushed by maintainers only.
+- Creates the project service account `release` in `platform/backend/api`, makes it a developer of the project and gives it a token rotated by apply every 90 days.
 - Nests in `platform/backend/api` a `LOG_LEVEL` variable, a read-only project deploy token, a read-only deploy key, a `production` environment and a reporter membership that expires with the tokens.
 - Creates 2 group variables (`PIPELINE_LOG_LEVEL`, and `REGISTRY_PASSWORD` masked and protected) and 1 file-type project variable.
 - Creates 1 group deploy token (`read_repository`, `read_registry`).
@@ -44,7 +48,7 @@ TF_VAR_registry_password="$(bao kv get -field=password kv/registry/ci)" \
 ## Outputs
 
 - `pipeline_schedule_ids`: schedule IDs keyed like the input.
-- `deploy_tokens`, `project_deploy_tokens`, `gitlab_runner_tokens`: sensitive; read them with `tofu output -json <name>` and store them straight in the system that consumes them.
+- `deploy_tokens`, `project_deploy_tokens`, `service_account_tokens`, `kubernetes_agent_tokens`, `gitlab_runner_tokens`: sensitive; read them with `tofu output -json <name>` and store them straight in the system that consumes them.
 
 ## Cleanup
 

@@ -20,3 +20,15 @@ output "gitlab_runner_tokens" {
   value       = module.gitlab_management.gitlab_runner_tokens
   sensitive   = true
 }
+
+output "service_account_tokens" {
+  description = "Service account tokens keyed \"<service account key>:<token name>\"; read with tofu output -json"
+  value       = module.gitlab_management.service_account_tokens
+  sensitive   = true
+}
+
+output "kubernetes_agent_tokens" {
+  description = "Kubernetes agent tokens keyed \"<project key>:<agent name>\", for installing the agent; read with tofu output -json"
+  value       = module.gitlab_management.kubernetes_agent_tokens
+  sensitive   = true
+}

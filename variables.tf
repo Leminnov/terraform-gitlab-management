@@ -31,6 +31,14 @@ locals {
   # Who may push, merge or create tags on a protected branch or tag.
   protection_access_levels = ["no one", "developer", "maintainer", "admin"]
 
+  # Personal access token scopes a service account token may take: the
+  # administrator scopes sudo and admin_mode are left out.
+  service_account_token_scopes = [
+    "api", "read_user", "read_api", "read_repository", "write_repository",
+    "read_registry", "write_registry", "read_virtual_registry", "write_virtual_registry",
+    "create_runner", "manage_runner", "ai_features", "self_rotate", "read_service_ping",
+  ]
+
   deploy_token_scopes = [
     "read_repository", "read_registry", "write_registry",
     "read_package_registry", "write_package_registry",
@@ -349,16 +357,21 @@ variable "gitlab_group_access_token" {
     Map of GitLab group access tokens. Each entry is expanded across its `groups` list. Fields:
       - groups        : Group paths or IDs to create the token in. Must be non-empty.
       - name          : Human-readable token name.
-      - expires_at    : Required expiry date, YYYY-MM-DD, within the instance's maximum token lifetime.
+      - expires_at    : Expiry date, YYYY-MM-DD, within the instance's maximum token lifetime. Exactly one of expires_at or rotation_configuration is required.
+      - rotation_configuration : { expiration_days, rotate_before_days }: the token lives expiration_days and the first apply within rotate_before_days of its expiry rotates it; GitLab then sets expires_at.
       - access_level  : One of no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner; null lets GitLab grant maintainer.
       - scopes        : Token scopes, non-empty: api, read_api, read_registry, write_registry, read_virtual_registry, write_virtual_registry, read_repository, write_repository, create_runner, manage_runner, ai_features, k8s_proxy, read_observability, write_observability, self_rotate.
   EOT
   type = map(object({
     groups       = list(string)
     name         = string
-    expires_at   = string
+    expires_at   = optional(string)
     access_level = optional(string)
     scopes       = list(string)
+    rotation_configuration = optional(object({
+      expiration_days    = number
+      rotate_before_days = number
+    }))
   }))
   default = {}
 
@@ -373,7 +386,7 @@ variable "gitlab_group_access_token" {
   validation {
     condition = alltrue([
       for v in values(var.gitlab_group_access_token) :
-      can(regex(local.day_regex, v.expires_at))
+      v.expires_at == null || can(regex(local.day_regex, v.expires_at))
     ])
     error_message = "gitlab_group_access_token[*].expires_at must be a date in YYYY-MM-DD format."
   }
@@ -399,6 +412,18 @@ variable "gitlab_group_access_token" {
     condition     = alltrue([for k in keys(var.gitlab_group_access_token) : !strcontains(k, ":")])
     error_message = "gitlab_group_access_token keys must not contain \":\" (reserved for objects nested in groups and projects)."
   }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in values(var.gitlab_group_access_token) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "gitlab_group_access_token[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
 }
 
 variable "gitlab_project_access_token" {
@@ -406,16 +431,21 @@ variable "gitlab_project_access_token" {
     Map of GitLab project access tokens. Each entry is expanded across its `projects` list. Fields:
       - projects      : Project paths or IDs to create the token in. Must be non-empty.
       - name          : Human-readable token name.
-      - expires_at    : Required expiry date, YYYY-MM-DD, within the instance's maximum token lifetime.
+      - expires_at    : Expiry date, YYYY-MM-DD, within the instance's maximum token lifetime. Exactly one of expires_at or rotation_configuration is required.
+      - rotation_configuration : { expiration_days, rotate_before_days }: the token lives expiration_days and the first apply within rotate_before_days of its expiry rotates it; GitLab then sets expires_at.
       - access_level  : One of no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner; null lets GitLab grant maintainer.
       - scopes        : Token scopes, non-empty: api, read_api, read_registry, write_registry, read_repository, write_repository, create_runner, manage_runner, ai_features, k8s_proxy, read_observability, write_observability, self_rotate.
   EOT
   type = map(object({
     projects     = list(string)
     name         = string
-    expires_at   = string
+    expires_at   = optional(string)
     access_level = optional(string)
     scopes       = list(string)
+    rotation_configuration = optional(object({
+      expiration_days    = number
+      rotate_before_days = number
+    }))
   }))
   default = {}
 
@@ -430,7 +460,7 @@ variable "gitlab_project_access_token" {
   validation {
     condition = alltrue([
       for v in values(var.gitlab_project_access_token) :
-      can(regex(local.day_regex, v.expires_at))
+      v.expires_at == null || can(regex(local.day_regex, v.expires_at))
     ])
     error_message = "gitlab_project_access_token[*].expires_at must be a date in YYYY-MM-DD format."
   }
@@ -455,6 +485,76 @@ variable "gitlab_project_access_token" {
   validation {
     condition     = alltrue([for k in keys(var.gitlab_project_access_token) : !strcontains(k, ":")])
     error_message = "gitlab_project_access_token keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in values(var.gitlab_project_access_token) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "gitlab_project_access_token[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+}
+
+variable "service_accounts" {
+  description = <<-EOT
+    Service accounts created in existing groups, top-level or intermediate (GitLab 18+, Free tier included), keyed by name. A top-level account can be invited anywhere; a subgroup account only within that subgroup. Grant access through members[*].service_account. Fields:
+      - group    : ID or full path of the existing group to create the account in.
+      - name     : Display name; default the key.
+      - username : Username; null lets GitLab generate one.
+      - email    : Email; null lets GitLab generate one. A custom address needs confirmation unless the group has a matching verified domain.
+      - tokens   : Personal access tokens of the account keyed by name: scopes (api, read_user, read_api, read_repository, write_repository, read_registry, write_registry, read_virtual_registry, write_virtual_registry, create_runner, manage_runner, ai_features, self_rotate, read_service_ping) and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by the first apply within rotate_before_days of expiry). Tokens are stored in state (SECURITY.md).
+  EOT
+  type = map(object({
+    group    = string
+    name     = optional(string)
+    username = optional(string)
+    email    = optional(string)
+    tokens = optional(map(object({
+      scopes     = list(string)
+      expires_at = optional(string)
+      rotation_configuration = optional(object({
+        expiration_days    = number
+        rotate_before_days = number
+      }))
+    })), {})
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for sa in values(var.service_accounts) : trimspace(sa.group) != ""])
+    error_message = "service_accounts[*].group must be a non-empty group ID or full path."
+  }
+
+  validation {
+    condition     = alltrue([for k in keys(var.service_accounts) : !strcontains(k, ":")])
+    error_message = "service_accounts keys must not contain \":\" (reserved for objects nested in groups and projects)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in values(var.service_accounts) : [for t in values(sa.tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.service_account_token_scopes, sc)])]]))
+    error_message = "service_accounts[*].tokens[*].scopes must be non-empty, each one of: ${join(", ", local.service_account_token_scopes)}."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([for sa in values(var.service_accounts) : [
+      for t in values(sa.tokens) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]]))
+    error_message = "service_accounts[*].tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in values(var.service_accounts) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
+    error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
 }
 
@@ -486,10 +586,12 @@ variable "groups" {
       - require_two_factor_authentication : Require two-factor authentication for members; null keeps the GitLab default.
       - archive_on_destroy                : Archive the group instead of deleting it on destroy; default true.
       - permanently_remove_on_delete      : With archive_on_destroy = false, remove the group at once instead of scheduling the deletion; default false.
+      - shared_runners_setting            : Instance runners for the group's subgroups and projects: enabled, disabled_and_overridable, disabled_and_unoverridable, disabled_with_override; null keeps GitLab's inherited value.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
-      - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
-      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
+      - members       : Memberships keyed by any label: exactly one of user_id (an existing user) or service_account (a service account key: a service_accounts key, "<group key>:<name>" of this group or a created ancestor, or on a project "<project key>:<name>" of the project itself), access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - service_accounts : Service accounts created in this group or project, keyed by name: name (display name; default the key), username and email (null: GitLab generates them), tokens keyed by name with scopes and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days }. They reach nothing until granted through members.
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
       - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600; null: no runner limit).
       - labels        : Labels keyed by name: color (#RRGGBB or a CSS colour name), description.
@@ -507,6 +609,7 @@ variable "groups" {
     require_two_factor_authentication = optional(bool)
     archive_on_destroy                = optional(bool, true)
     permanently_remove_on_delete      = optional(bool, false)
+    shared_runners_setting            = optional(string)
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -519,14 +622,32 @@ variable "groups" {
       scopes     = list(string)
     })), {})
     access_tokens = optional(map(object({
-      expires_at   = string
+      expires_at   = optional(string)
       access_level = optional(string)
       scopes       = list(string)
+      rotation_configuration = optional(object({
+        expiration_days    = number
+        rotate_before_days = number
+      }))
     })), {})
     members = optional(map(object({
-      user_id      = number
-      access_level = string
-      expires_at   = optional(string)
+      user_id         = optional(number)
+      service_account = optional(string)
+      access_level    = string
+      expires_at      = optional(string)
+    })), {})
+    service_accounts = optional(map(object({
+      name     = optional(string)
+      username = optional(string)
+      email    = optional(string)
+      tokens = optional(map(object({
+        scopes     = list(string)
+        expires_at = optional(string)
+        rotation_configuration = optional(object({
+          expiration_days    = number
+          rotate_before_days = number
+        }))
+      })), {})
     })), {})
     shared_with = optional(map(object({
       group        = optional(string)
@@ -653,7 +774,7 @@ variable "groups" {
   }
 
   validation {
-    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : can(regex(local.day_regex, t.expires_at))]]))
+    condition     = alltrue(flatten([for o in values(var.groups) : [for t in values(o.access_tokens) : t.expires_at == null || can(regex(local.day_regex, t.expires_at))]]))
     error_message = "access_tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
 
@@ -722,6 +843,64 @@ variable "groups" {
     condition     = alltrue(flatten([for o in values(var.groups) : [for h in values(o.hooks) : h.signing_token == null || can(regex("^whsec_[A-Za-z0-9+/]{43}=$", coalesce(h.signing_token, "-")))]]))
     error_message = "hooks[*].signing_token must be whsec_ followed by the base64 of a 32-byte key."
   }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.groups) : [for m in values(o.members) : (m.user_id == null) != (m.service_account == null)]]))
+    error_message = "members[*] must set exactly one of user_id or service_account."
+  }
+
+  validation {
+    # A subgroup service account can be invited only within that subgroup.
+    condition = alltrue(flatten([
+      for gk, o in var.groups : [
+        for m in values(o.members) : m.service_account == null ? true : (
+          contains(keys(var.service_accounts), coalesce(m.service_account, "-")) || anytrue(flatten([
+            for g2, o2 in var.groups : [for n in keys(o2.service_accounts) : "${g2}:${n}" == m.service_account && (gk == g2 || startswith(gk, "${g2}/"))]
+          ]))
+        )
+      ]
+    ]))
+    error_message = "members[*].service_account must be a service_accounts key, a service account of this group or of a created ancestor group, or one of this project's own service accounts."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [for t in values(sa.tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.service_account_token_scopes, sc)])]]))
+    error_message = "service_accounts[*].tokens[*].scopes must be non-empty, each one of: ${join(", ", local.service_account_token_scopes)}."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [
+      for t in values(sa.tokens) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]]))
+    error_message = "service_accounts[*].tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.groups) : values(o.service_accounts)]) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
+    error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in flatten([for o in values(var.groups) : values(o.access_tokens)]) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "access_tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.groups) : v.shared_runners_setting == null || contains(["enabled", "disabled_and_overridable", "disabled_and_unoverridable", "disabled_with_override"], coalesce(v.shared_runners_setting, "-"))])
+    error_message = "groups[*].shared_runners_setting must be one of: enabled, disabled_and_overridable, disabled_and_unoverridable, disabled_with_override."
+  }
 }
 
 variable "projects" {
@@ -743,10 +922,23 @@ variable "projects" {
       - remove_source_branch_after_merge                 : Delete the source branch on merge by default; default true.
       - archive_on_destroy            : Archive the project instead of deleting it on destroy; default true.
       - permanently_delete_on_destroy : With archive_on_destroy = false, delete the project at once instead of scheduling the deletion; default false.
+      - ci                      : CI/CD settings. hardening_enabled (default false) sends, unless set explicitly, public_jobs = false, pipeline_variables_minimum_override_role = no_one_allowed, protect_merge_request_pipelines = true, separated_caches = true, forward_deployment_enabled = true, push_repository_for_job_token_allowed = false and allow_merge_on_skipped_pipeline = false; with hardening off only the explicit ones are sent. Other fields, null keeping GitLab's value: config_path, auto_cancel_pending_pipelines (enabled, disabled), build_timeout (600-2592000 s), default_git_depth (0-1000), delete_pipelines_in_seconds (86400-31536000), id_token_sub_claim_components (project_path first, then ref_type, ref), group_runners_enabled, shared_runners_enabled. Premium: merge_pipelines_enabled, merge_trains_enabled, restrict_pipeline_cancellation_role (developer, maintainer, no_one), allow_pipeline_trigger_approve_deployment.
+      - freeze_periods          : Deploy freezes keyed by label: freeze_start and freeze_end (5-field cron), cron_timezone (default UTC).
+      - secure_files            : CI/CD secure files keyed by file name (no /), with their text content. Redacted in plans, stored in state (SECURITY.md).
+      - cicd_catalog            : Publish the project as a CI/CD catalog resource; default false. Needs a description.
+      - enabled_runners         : Unlocked project runners of other created projects to enable here, as "<project key>:<runner name>"; enabled_runner_ids for existing runners by ID.
+      - enabled_deploy_keys     : Deploy keys of other created projects to enable here read-only, as "<project key>:<title>"; enabled_deploy_key_ids for existing deploy keys by ID.
+      - package_protection_rules       : Keyed by label: package_type (cargo, conan, generic, helm, maven, npm, nuget, pypi, terraform_module), package_name_pattern (wildcard *), minimum_access_level_for_push (maintainer (default), owner, admin), minimum_access_level_for_delete (null, owner, admin).
+      - container_protection_rules     : Keyed by label: path_pattern, appended to the project's full path ("*" for every image), minimum_access_level_for_push and minimum_access_level_for_delete (maintainer (default), owner, admin).
+      - container_tag_protection_rules : Keyed by label: tag_name_pattern (regular expression, 1-100 characters), minimum_access_level_for_push and minimum_access_level_for_delete (maintainer (default), owner, admin). Ultimate: immutable = true (no access levels then).
+      - files                          : Files committed to the default branch, keyed by relative path: content, encoding (text (default) or base64), executable (default false), managed (default true: Terraform owns the content and reverts edits; false: committed once, then owned by the developers). Branches created by the module include them.
+      - kubernetes_agents              : GitLab agents for Kubernetes keyed by name (DNS label), each with a token (kubernetes_agent_tokens output) and ci_access { groups, projects (keys of groups / projects), group_paths, project_paths (existing full paths) } written to the managed file .gitlab/agents/<name>/config.yaml.
+      - container_expiration_policy    : null keeps GitLab's cleanup policy; when set, cleanup is enabled with cadence (1d, 7d (default), 14d, 1month, 3month), keep_n (1, 5, 10 (default), 25, 50, 100), older_than (7d, 14d, 30d, 90d (default)), name_regex_delete (default .*) and name_regex_keep.
       - variables     : CI/CD variables keyed by variable key: value, variable_type (env_var default, file), protected and masked (default false). Values are redacted in plans and stored in state (SECURITY.md).
       - deploy_tokens : Deploy tokens keyed by name: username (null: GitLab generates one), expires_at (required, RFC 3339), scopes (read_repository, read_registry, write_registry, read_package_registry, write_package_registry, read_virtual_registry, write_virtual_registry).
-      - access_tokens : Access tokens keyed by name: expires_at (required, YYYY-MM-DD), access_level (null lets GitLab grant maintainer), scopes.
-      - members       : User memberships keyed by any label: user_id, access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - access_tokens : Access tokens keyed by name: exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days } (rotated by apply), access_level (null lets GitLab grant maintainer), scopes.
+      - members       : Memberships keyed by any label: exactly one of user_id (an existing user) or service_account (a service account key: a service_accounts key, "<group key>:<name>" of this group or a created ancestor, or on a project "<project key>:<name>" of the project itself), access_level (no one, minimal, guest, planner, reporter, security_manager, developer, maintainer, owner), expires_at (YYYY-MM-DD; null: no expiry).
+      - service_accounts : Service accounts created in this group or project, keyed by name: name (display name; default the key), username and email (null: GitLab generates them), tokens keyed by name with scopes and exactly one of expires_at (YYYY-MM-DD) or rotation_configuration { expiration_days, rotate_before_days }. They reach nothing until granted through members.
       - shared_with   : Shares keyed by any label: exactly one of group (a groups key) or group_id (an existing group ID), access_level, expires_at (YYYY-MM-DD; null: no expiry).
       - runners       : Runners keyed by name: description (default the name), access_level (ref_protected default, not_protected), tag_list (required unless untagged), untagged, paused, locked, maximum_timeout (seconds, >= 600; null: no runner limit).
       - deploy_keys         : SSH deploy keys keyed by title: key (OpenSSH public key), expires_at (required, RFC 3339), can_push (default false).
@@ -759,6 +951,7 @@ variable "projects" {
       - approval_rules          : Premium. Approval rules keyed by name: approvals_required (>= 0), user_ids, group_ids, applies_to_all_protected_branches (default true).
       - merge_request_approvals : Premium. When set: reset_approvals_on_push (default true), merge_requests_author_approval (default false), merge_requests_disable_committers_approval and disable_overriding_approvers_per_merge_request (default true).
       - push_rules              : Premium. When set: prevent_secrets, deny_delete_tag and member_check (default true), reject_unsigned_commits, commit_message_regex, branch_name_regex, author_email_regex, max_file_size (MB); null keeps GitLab's default (off, no limit).
+      - target_branch_rules     : Premium. Default merge request target per source branch pattern, for example { "feature/*" = "develop" }.
       - protected_environments  : Premium. Protected environments keyed by a name declared in environments: deploy_access_level (developer or maintainer (default)), required_approvals (null: deploys need no approval).
       - job_token_allowlist : When set, only the job tokens of this project and of the listed projects and groups (keys of projects / groups, or existing project_ids / group_ids) may access the project; null leaves GitLab's default.
   EOT
@@ -789,6 +982,85 @@ variable "projects" {
     remove_source_branch_after_merge                 = optional(bool, true)
     archive_on_destroy                               = optional(bool, true)
     permanently_delete_on_destroy                    = optional(bool, false)
+    ci = optional(object({
+      hardening_enabled = optional(bool, false)
+      # Security settings: null takes the hardened value when hardening is on,
+      # and sends nothing otherwise (locals.tf).
+      public_jobs                              = optional(bool)
+      pipeline_variables_minimum_override_role = optional(string)
+      protect_merge_request_pipelines          = optional(bool)
+      separated_caches                         = optional(bool)
+      forward_deployment_enabled               = optional(bool)
+      push_repository_for_job_token_allowed    = optional(bool)
+      allow_merge_on_skipped_pipeline          = optional(bool)
+      # Other settings: null keeps GitLab's value.
+      config_path                   = optional(string)
+      auto_cancel_pending_pipelines = optional(string)
+      build_timeout                 = optional(number)
+      default_git_depth             = optional(number)
+      delete_pipelines_in_seconds   = optional(number)
+      id_token_sub_claim_components = optional(list(string))
+      group_runners_enabled         = optional(bool)
+      shared_runners_enabled        = optional(bool)
+      # Premium
+      merge_pipelines_enabled                   = optional(bool)
+      merge_trains_enabled                      = optional(bool)
+      restrict_pipeline_cancellation_role       = optional(string)
+      allow_pipeline_trigger_approve_deployment = optional(bool)
+    }), {})
+    freeze_periods = optional(map(object({
+      freeze_start  = string
+      freeze_end    = string
+      cron_timezone = optional(string, "UTC")
+    })), {})
+    secure_files = optional(map(string), {})
+    cicd_catalog = optional(bool, false)
+    # Sharing with other projects
+    enabled_runners        = optional(set(string), [])
+    enabled_runner_ids     = optional(set(number), [])
+    enabled_deploy_keys    = optional(set(string), [])
+    enabled_deploy_key_ids = optional(set(number), [])
+    # Registries
+    package_protection_rules = optional(map(object({
+      package_type                    = string
+      package_name_pattern            = string
+      minimum_access_level_for_push   = optional(string, "maintainer")
+      minimum_access_level_for_delete = optional(string)
+    })), {})
+    container_protection_rules = optional(map(object({
+      path_pattern                    = string
+      minimum_access_level_for_push   = optional(string, "maintainer")
+      minimum_access_level_for_delete = optional(string, "maintainer")
+    })), {})
+    container_tag_protection_rules = optional(map(object({
+      tag_name_pattern                = string
+      minimum_access_level_for_push   = optional(string, "maintainer")
+      minimum_access_level_for_delete = optional(string, "maintainer")
+      # Ultimate
+      immutable = optional(bool, false)
+    })), {})
+    container_expiration_policy = optional(object({
+      cadence           = optional(string, "7d")
+      keep_n            = optional(number, 10)
+      older_than        = optional(string, "90d")
+      name_regex_delete = optional(string, ".*")
+      name_regex_keep   = optional(string)
+    }))
+    # Repository content
+    files = optional(map(object({
+      content    = string
+      managed    = optional(bool, true)
+      encoding   = optional(string, "text")
+      executable = optional(bool, false)
+    })), {})
+    kubernetes_agents = optional(map(object({
+      ci_access = optional(object({
+        groups        = optional(set(string), [])
+        projects      = optional(set(string), [])
+        group_paths   = optional(set(string), [])
+        project_paths = optional(set(string), [])
+      }), {})
+    })), {})
     variables = optional(map(object({
       value         = string
       variable_type = optional(string, "env_var")
@@ -801,14 +1073,32 @@ variable "projects" {
       scopes     = list(string)
     })), {})
     access_tokens = optional(map(object({
-      expires_at   = string
+      expires_at   = optional(string)
       access_level = optional(string)
       scopes       = list(string)
+      rotation_configuration = optional(object({
+        expiration_days    = number
+        rotate_before_days = number
+      }))
     })), {})
     members = optional(map(object({
-      user_id      = number
-      access_level = string
-      expires_at   = optional(string)
+      user_id         = optional(number)
+      service_account = optional(string)
+      access_level    = string
+      expires_at      = optional(string)
+    })), {})
+    service_accounts = optional(map(object({
+      name     = optional(string)
+      username = optional(string)
+      email    = optional(string)
+      tokens = optional(map(object({
+        scopes     = list(string)
+        expires_at = optional(string)
+        rotation_configuration = optional(object({
+          expiration_days    = number
+          rotate_before_days = number
+        }))
+      })), {})
     })), {})
     shared_with = optional(map(object({
       group        = optional(string)
@@ -876,6 +1166,7 @@ variable "projects" {
       deploy_access_level = optional(string, "maintainer")
       required_approvals  = optional(number)
     })), {})
+    target_branch_rules = optional(map(string), {})
     deploy_keys = optional(map(object({
       key        = string
       expires_at = optional(string)
@@ -996,7 +1287,7 @@ variable "projects" {
   }
 
   validation {
-    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : can(regex(local.day_regex, t.expires_at))]]))
+    condition     = alltrue(flatten([for o in values(var.projects) : [for t in values(o.access_tokens) : t.expires_at == null || can(regex(local.day_regex, t.expires_at))]]))
     error_message = "access_tokens[*].expires_at must be a date in YYYY-MM-DD format."
   }
 
@@ -1123,5 +1414,222 @@ variable "projects" {
   validation {
     condition     = alltrue(flatten([for o in values(var.projects) : [for e in values(o.protected_environments) : contains(["developer", "maintainer"], e.deploy_access_level) && (e.required_approvals == null || coalesce(e.required_approvals, 0) >= 0)]]))
     error_message = "protected_environments[*].deploy_access_level must be developer or maintainer, and required_approvals null or >= 0."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for m in values(o.members) : (m.user_id == null) != (m.service_account == null)]]))
+    error_message = "members[*] must set exactly one of user_id or service_account."
+  }
+
+  validation {
+    # ns binds the project's group key; a project service account can be
+    # invited only to its own project.
+    condition = alltrue(flatten([
+      for pk, o in var.projects : [
+        for ns in [join("/", slice(split("/", pk), 0, length(split("/", pk)) - 1))] : [
+          for m in values(o.members) : m.service_account == null ? true : (
+            contains(keys(var.service_accounts), coalesce(m.service_account, "-")) ||
+            contains([for n in keys(o.service_accounts) : "${pk}:${n}"], coalesce(m.service_account, "-")) ||
+            anytrue(flatten([
+              for g2, o2 in var.groups : [for n in keys(o2.service_accounts) : "${g2}:${n}" == m.service_account && ns != "" && (ns == g2 || startswith(ns, "${g2}/"))]
+            ]))
+          )
+        ]
+      ]
+    ]))
+    error_message = "members[*].service_account must be a service_accounts key, a service account of this group or of a created ancestor group, or one of this project's own service accounts."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [for t in values(sa.tokens) : length(t.scopes) > 0 && alltrue([for sc in t.scopes : contains(local.service_account_token_scopes, sc)])]]))
+    error_message = "service_accounts[*].tokens[*].scopes must be non-empty, each one of: ${join(", ", local.service_account_token_scopes)}."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [
+      for t in values(sa.tokens) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]]))
+    error_message = "service_accounts[*].tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for sa in flatten([for o in values(var.projects) : values(o.service_accounts)]) : [for t in values(sa.tokens) : t.expires_at == null || can(regex(local.day_regex, coalesce(t.expires_at, "-")))]]))
+    error_message = "service_accounts[*].tokens[*].expires_at must be a date in YYYY-MM-DD format."
+  }
+
+  validation {
+    # HCL evaluates both branches of a conditional but reports only the chosen one.
+    condition = alltrue(flatten([
+      for t in flatten([for o in values(var.projects) : values(o.access_tokens)]) : (t.expires_at == null) != (t.rotation_configuration == null) && (
+        t.rotation_configuration == null ? true : (
+          t.rotation_configuration.expiration_days >= 1 && t.rotation_configuration.rotate_before_days >= 1 && t.rotation_configuration.rotate_before_days < t.rotation_configuration.expiration_days
+        )
+      )
+    ]))
+    error_message = "access_tokens[*] must set exactly one of expires_at (YYYY-MM-DD) or rotation_configuration (expiration_days >= 1, 1 <= rotate_before_days < expiration_days)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.pipeline_variables_minimum_override_role == null || contains(["no_one_allowed", "developer", "maintainer", "owner"], coalesce(v.ci.pipeline_variables_minimum_override_role, "-"))])
+    error_message = "ci.pipeline_variables_minimum_override_role must be one of: no_one_allowed, developer, maintainer, owner."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.auto_cancel_pending_pipelines == null || contains(["enabled", "disabled"], coalesce(v.ci.auto_cancel_pending_pipelines, "-"))])
+    error_message = "ci.auto_cancel_pending_pipelines must be enabled or disabled."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.build_timeout == null ? true : v.ci.build_timeout >= 600 && v.ci.build_timeout <= 2592000])
+    error_message = "ci.build_timeout must be null or between 600 and 2592000 seconds (10 minutes to 30 days)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.default_git_depth == null ? true : v.ci.default_git_depth >= 0 && v.ci.default_git_depth <= 1000])
+    error_message = "ci.default_git_depth must be null or between 0 and 1000."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.delete_pipelines_in_seconds == null ? true : v.ci.delete_pipelines_in_seconds >= 86400 && v.ci.delete_pipelines_in_seconds <= 31536000])
+    error_message = "ci.delete_pipelines_in_seconds must be null or between 86400 and 31536000 seconds (1 day to 1 year)."
+  }
+
+  validation {
+    condition = alltrue([
+      for v in values(var.projects) : v.ci.id_token_sub_claim_components == null ? true : (
+        length(v.ci.id_token_sub_claim_components) == 0 ? false : (
+          v.ci.id_token_sub_claim_components[0] == "project_path" &&
+          alltrue([for c in slice(v.ci.id_token_sub_claim_components, 1, length(v.ci.id_token_sub_claim_components)) : contains(["ref_type", "ref"], c)])
+        )
+      )
+    ])
+    error_message = "ci.id_token_sub_claim_components must start with project_path and otherwise contain only ref_type and ref."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for f in values(o.freeze_periods) : length(split(" ", trimspace(f.freeze_start))) == 5 && length(split(" ", trimspace(f.freeze_end))) == 5]]))
+    error_message = "freeze_periods[*].freeze_start and freeze_end must be cron expressions with 5 fields."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for name, content in o.secure_files : trimspace(name) != "" && !strcontains(name, "/") && content != ""]]))
+    error_message = "secure_files keys must be file names without / and values non-empty text."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : !v.cicd_catalog || trimspace(coalesce(v.description, " ")) != ""])
+    error_message = "projects[*].cicd_catalog requires a description (GitLab lists catalog projects by it)."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for pk, o in var.projects : [
+        for e in o.enabled_runners : anytrue(flatten([
+          for p2, o2 in var.projects : [for n, r in o2.runners : "${p2}:${n}" == e && p2 != pk && !r.locked]
+        ]))
+      ]
+    ]))
+    error_message = "enabled_runners entries must name an unlocked runner of another created project, as \"<project key>:<runner name>\"."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for pk, o in var.projects : [
+        for e in o.enabled_deploy_keys : anytrue(flatten([
+          for p2, o2 in var.projects : [for t in keys(o2.deploy_keys) : "${p2}:${t}" == e && p2 != pk]
+        ]))
+      ]
+    ]))
+    error_message = "enabled_deploy_keys entries must name a deploy key of another created project, as \"<project key>:<title>\"."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.package_protection_rules) : contains(["cargo", "conan", "generic", "helm", "maven", "npm", "nuget", "pypi", "terraform_module"], r.package_type)]]))
+    error_message = "package_protection_rules[*].package_type must be one of: cargo, conan, generic, helm, maven, npm, nuget, pypi, terraform_module."
+  }
+
+  validation {
+    condition = alltrue(flatten([for o in values(var.projects) : [
+      for r in values(o.package_protection_rules) : trimspace(r.package_name_pattern) != "" && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_push) && (r.minimum_access_level_for_delete == null || contains(["owner", "admin"], coalesce(r.minimum_access_level_for_delete, "-")))
+    ]]))
+    error_message = "package_protection_rules[*] needs a package_name_pattern, minimum_access_level_for_push maintainer, owner or admin, and minimum_access_level_for_delete null, owner or admin."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for r in values(o.container_protection_rules) : contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_push) && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_delete)]]))
+    error_message = "container_protection_rules[*] access levels must be maintainer, owner or admin."
+  }
+
+  validation {
+    condition = alltrue(flatten([for o in values(var.projects) : [
+      for r in values(o.container_tag_protection_rules) : length(r.tag_name_pattern) >= 1 && length(r.tag_name_pattern) <= 100 && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_push) && contains(["maintainer", "owner", "admin"], r.minimum_access_level_for_delete)
+    ]]))
+    error_message = "container_tag_protection_rules[*] needs a tag_name_pattern of 1 to 100 characters and access levels maintainer, owner or admin."
+  }
+
+  validation {
+    condition = alltrue([
+      for o in values(var.projects) : o.container_expiration_policy == null ? true : (
+        contains(["1d", "7d", "14d", "1month", "3month"], o.container_expiration_policy.cadence) &&
+        contains([1, 5, 10, 25, 50, 100], o.container_expiration_policy.keep_n) &&
+        contains(["7d", "14d", "30d", "90d"], o.container_expiration_policy.older_than)
+      )
+    ])
+    error_message = "container_expiration_policy cadence must be 1d, 7d, 14d, 1month or 3month, keep_n one of 1, 5, 10, 25, 50, 100, and older_than one of 7d, 14d, 30d, 90d."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for path in keys(o.files) : trimspace(path) != "" && !startswith(path, "/") && !startswith(path, "./") && !contains(split("/", path), "..")]]))
+    error_message = "files keys must be relative paths without a leading / or ./ and without .. segments."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for f in values(o.files) : contains(["text", "base64"], f.encoding)]]))
+    error_message = "files[*].encoding must be text or base64."
+  }
+
+  validation {
+    condition     = alltrue([for o in values(var.projects) : o.initialize_with_readme || (length(o.files) == 0 && length(o.kubernetes_agents) == 0)])
+    error_message = "projects[*].files and kubernetes_agents need initialize_with_readme = true (a default branch to commit to)."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for name in keys(o.kubernetes_agents) : can(regex("^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$", name))]]))
+    error_message = "kubernetes_agents keys must be DNS labels: lowercase letters, digits and -, at most 63 characters."
+  }
+
+  validation {
+    condition = alltrue(flatten([for o in values(var.projects) : [
+      for a in values(o.kubernetes_agents) : concat(
+        [for g in a.ci_access.groups : contains(keys(var.groups), g)],
+        [for p in a.ci_access.projects : contains(keys(var.projects), p)],
+      )
+    ]]))
+    error_message = "kubernetes_agents[*].ci_access groups and projects must be keys of groups and projects."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for name in keys(o.kubernetes_agents) : !contains(keys(o.files), ".gitlab/agents/${name}/config.yaml")]]))
+    error_message = "files keys must not use .gitlab/agents/<name>/config.yaml for a declared kubernetes_agents entry (the module writes it)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : !(v.ci.merge_trains_enabled == true) || v.ci.merge_pipelines_enabled == true])
+    error_message = "ci.merge_trains_enabled requires ci.merge_pipelines_enabled = true."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.restrict_pipeline_cancellation_role == null || contains(["developer", "maintainer", "no_one"], coalesce(v.ci.restrict_pipeline_cancellation_role, "-"))])
+    error_message = "ci.restrict_pipeline_cancellation_role must be one of: developer, maintainer, no_one."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for pattern, target in o.target_branch_rules : trimspace(pattern) != "" && trimspace(target) != ""]]))
+    error_message = "target_branch_rules values must be non-empty branch names."
   }
 }

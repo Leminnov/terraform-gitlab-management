@@ -24,6 +24,44 @@ resource "gitlab_project" "this" {
   remove_source_branch_after_merge                 = each.value.remove_source_branch_after_merge
   archive_on_destroy                               = each.value.archive_on_destroy
   permanently_delete_on_destroy                    = each.value.permanently_delete_on_destroy
+
+  # CI/CD settings: null sends nothing and keeps GitLab's value (all
+  # Optional+Computed in the provider, ci_config_path Optional only).
+  public_jobs                                 = each.value.ci.public_jobs
+  ci_pipeline_variables_minimum_override_role = each.value.ci.pipeline_variables_minimum_override_role
+  protect_merge_request_pipelines             = each.value.ci.protect_merge_request_pipelines
+  ci_separated_caches                         = each.value.ci.separated_caches
+  ci_forward_deployment_enabled               = each.value.ci.forward_deployment_enabled
+  ci_push_repository_for_job_token_allowed    = each.value.ci.push_repository_for_job_token_allowed
+  allow_merge_on_skipped_pipeline             = each.value.ci.allow_merge_on_skipped_pipeline
+  ci_config_path                              = each.value.ci.config_path
+  auto_cancel_pending_pipelines               = each.value.ci.auto_cancel_pending_pipelines
+  build_timeout                               = each.value.ci.build_timeout
+  ci_default_git_depth                        = each.value.ci.default_git_depth
+  ci_delete_pipelines_in_seconds              = each.value.ci.delete_pipelines_in_seconds
+  ci_id_token_sub_claim_components            = each.value.ci.id_token_sub_claim_components
+  group_runners_enabled                       = each.value.ci.group_runners_enabled
+  shared_runners_enabled                      = each.value.ci.shared_runners_enabled
+  # Premium; null sends nothing.
+  merge_pipelines_enabled                   = each.value.ci.merge_pipelines_enabled
+  merge_trains_enabled                      = each.value.ci.merge_trains_enabled
+  ci_restrict_pipeline_cancellation_role    = each.value.ci.restrict_pipeline_cancellation_role
+  allow_pipeline_trigger_approve_deployment = each.value.ci.allow_pipeline_trigger_approve_deployment
+
+  # Container cleanup, only when the caller sets a policy: deleting images is
+  # never a default.
+  dynamic "container_expiration_policy" {
+    for_each = each.value.container_expiration_policy == null ? [] : [each.value.container_expiration_policy]
+
+    content {
+      enabled           = true
+      cadence           = container_expiration_policy.value.cadence
+      keep_n            = container_expiration_policy.value.keep_n
+      older_than        = container_expiration_policy.value.older_than
+      name_regex_delete = container_expiration_policy.value.name_regex_delete
+      name_regex_keep   = container_expiration_policy.value.name_regex_keep
+    }
+  }
 }
 
 resource "gitlab_branch" "this" {
@@ -32,6 +70,10 @@ resource "gitlab_branch" "this" {
   project = gitlab_project.this[each.value.project].id
   name    = each.value.name
   ref     = each.value.ref
+
+  # Branches start from the default branch once its files are committed, so
+  # develop holds them too.
+  depends_on = [gitlab_repository_file.managed, gitlab_repository_file.seeded]
 }
 
 # One protection per branch: the provider takes over the default-branch

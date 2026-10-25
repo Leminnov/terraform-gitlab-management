@@ -7,14 +7,25 @@
 #               gitlab_deploy_token), gitlab_project_deploy_token,
 #               gitlab_deploy_key, gitlab_group_membership,
 #               gitlab_project_membership, gitlab_group_share_group,
-#               gitlab_project_share_group
+#               gitlab_project_share_group, gitlab_deploy_key_enable
+#   service_accounts.tf gitlab_group_service_account,
+#               gitlab_project_service_account and their access tokens
 #   ci.tf       gitlab_group_variable, gitlab_project_variable,
 #               gitlab_pipeline_schedule, gitlab_pipeline_schedule_variable,
 #               gitlab_user_runner, gitlab_project_environment,
-#               gitlab_pipeline_trigger, gitlab_project_job_token_scopes
+#               gitlab_pipeline_trigger, gitlab_project_job_token_scopes,
+#               gitlab_project_freeze_period, gitlab_project_secure_file,
+#               gitlab_project_cicd_catalog, gitlab_project_runner_enablement,
+#               gitlab_cluster_agent, gitlab_cluster_agent_token
+#   registry.tf gitlab_project_package_protection_rule,
+#               gitlab_project_container_repository_protection,
+#               gitlab_project_container_tag_protection
+#   files.tf    gitlab_repository_file.managed and .seeded (with the agents'
+#               config.yaml)
 #   metadata.tf gitlab_group_label, gitlab_project_label, gitlab_group_badge,
 #               gitlab_project_badge, gitlab_project_hook
 #   premium.tf  gitlab_project_approval_rule, gitlab_project_level_mr_approvals,
 #               gitlab_project_push_rules, gitlab_project_protected_environment,
-#               gitlab_group_hook (Premium, none planned unless set)
+#               gitlab_group_hook, gitlab_project_target_branch_rule (Premium,
+#               none planned unless set)
 #   checks.tf   plan-time guardrails (check blocks)

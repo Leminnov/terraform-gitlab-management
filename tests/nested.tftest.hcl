@@ -11,6 +11,12 @@ mock_provider "gitlab" {
   mock_resource "gitlab_project" {
     defaults = { id = "2000" }
   }
+  mock_resource "gitlab_user_runner" {
+    defaults = { id = "5000" }
+  }
+  mock_resource "gitlab_deploy_key" {
+    defaults = { deploy_key_id = 6000 }
+  }
 }
 
 variables {
@@ -623,6 +629,172 @@ run "project_job_token_unknown_project_is_rejected" {
 
   variables {
     projects = { "platform/api" = { job_token_allowlist = { projects = ["platform/missing"] } } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+# ---------------------------------------------------------------------------
+# Rotation of nested access tokens (access-tokens spec)
+# ---------------------------------------------------------------------------
+
+run "nested_rotating_access_token" {
+  command = plan
+
+  variables {
+    projects = {
+      "platform/api" = {
+        access_tokens = { bot = { access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 60, rotate_before_days = 7 } } }
+      }
+    }
+  }
+
+  assert {
+    condition     = gitlab_project_access_token.this["platform/api:bot"].rotation_configuration.expiration_days == 60 && local.project_access_tokens["platform/api:bot"].expires_at == null
+    error_message = "A nested rotating token must send its rotation and no expiry."
+  }
+}
+
+run "group_nested_token_without_expiry_or_rotation_is_rejected" {
+  command = plan
+
+  variables {
+    groups = { platform = { access_tokens = { bot = { access_level = "developer", scopes = ["read_api"] } } }, teams = {} }
+  }
+
+  expect_failures = [
+    var.groups,
+  ]
+}
+
+run "project_nested_token_rotation_window_as_long_as_lifetime_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = { access_tokens = { bot = { access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 30, rotate_before_days = 30 } } } } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+# ---------------------------------------------------------------------------
+# Runners and deploy keys shared with other projects (runners and deploy-keys
+# specs)
+# ---------------------------------------------------------------------------
+
+run "runner_and_deploy_key_shared_with_another_project" {
+  command = plan
+
+  variables {
+    projects = {
+      "platform/api" = {
+        runners     = { build = { tag_list = ["build"] }, private = { tag_list = ["private"], locked = true } }
+        deploy_keys = { argocd = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
+      }
+      tools = {
+        enabled_runners        = ["platform/api:build"]
+        enabled_runner_ids     = [77]
+        enabled_deploy_keys    = ["platform/api:argocd"]
+        enabled_deploy_key_ids = [88]
+      }
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      toset(keys(gitlab_project_runner_enablement.this)) == toset(["tools:platform/api:build", "tools:77"]),
+      gitlab_project_runner_enablement.this["tools:platform/api:build"].runner_id == 5000,
+      gitlab_project_runner_enablement.this["tools:77"].runner_id == 77,
+      gitlab_project_runner_enablement.this["tools:77"].project == "2000",
+    ])
+    error_message = "Runner enablements must be keyed \"<project key>:<runner key or ID>\" and resolve the runner ID."
+  }
+  assert {
+    condition = alltrue([
+      toset(keys(gitlab_deploy_key_enable.this)) == toset(["tools:platform/api:argocd", "tools:88"]),
+      gitlab_deploy_key_enable.this["tools:platform/api:argocd"].key_id == "6000",
+      gitlab_deploy_key_enable.this["tools:88"].key_id == "88",
+      gitlab_deploy_key_enable.this["tools:platform/api:argocd"].can_push == false,
+    ])
+    error_message = "Deploy key enablements must be read-only, keyed like runner enablements."
+  }
+}
+
+run "own_runner_enabled_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = {
+      runners         = { build = { tag_list = ["build"] }, private = { tag_list = ["private"], locked = true } }
+      enabled_runners = ["platform/api:build"]
+      deploy_keys     = { argocd = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
+    } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "locked_runner_enabled_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = {
+      runners     = { build = { tag_list = ["build"] }, private = { tag_list = ["private"], locked = true } }
+      deploy_keys = { argocd = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
+    }, tools = { enabled_runners = ["platform/api:private"] } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "group_runner_enabled_is_rejected" {
+  command = plan
+
+  variables {
+    groups = { platform = { runners = { docker = { tag_list = ["docker"] } } }, teams = {} }
+    projects = { "platform/api" = {
+      runners     = { build = { tag_list = ["build"] }, private = { tag_list = ["private"], locked = true } }
+      deploy_keys = { argocd = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
+    }, tools = { enabled_runners = ["platform:docker"] } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "own_deploy_key_enabled_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = {
+      runners             = { build = { tag_list = ["build"] }, private = { tag_list = ["private"], locked = true } }
+      enabled_deploy_keys = ["platform/api:argocd"]
+      deploy_keys         = { argocd = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
+    } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "unknown_deploy_key_enabled_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = {
+      runners     = { build = { tag_list = ["build"] }, private = { tag_list = ["private"], locked = true } }
+      deploy_keys = { argocd = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
+    }, tools = { enabled_deploy_keys = ["platform/api:missing"] } }
   }
 
   expect_failures = [

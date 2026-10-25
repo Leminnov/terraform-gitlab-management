@@ -9,6 +9,12 @@ mock_provider "gitlab" {
   mock_resource "gitlab_project" {
     defaults = { id = "2000" }
   }
+  mock_resource "gitlab_group_service_account" {
+    defaults = { service_account_id = "3000" }
+  }
+  mock_resource "gitlab_project_service_account" {
+    defaults = { service_account_id = "4000" }
+  }
 }
 
 variables {
@@ -185,6 +191,92 @@ run "nested_two_year_project_access_token_warns" {
   ]
 }
 
+run "explicit_public_jobs_warns" {
+  command = plan
+
+  variables {
+    projects = { tools = { ci = { public_jobs = true } } }
+  }
+
+  expect_failures = [
+    check.public_jobs,
+  ]
+}
+
+run "job_token_pushes_warn" {
+  command = plan
+
+  variables {
+    projects = { tools = { ci = { push_repository_for_job_token_allowed = true } } }
+  }
+
+  expect_failures = [
+    check.job_token_push,
+  ]
+}
+
+run "two_year_service_account_token_warns" {
+  command = plan
+
+  variables {
+    service_accounts = { bot = { group = "leminnov", tokens = { ci = { scopes = ["read_api"], expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "17520h")) } } } }
+  }
+
+  expect_failures = [
+    check.token_lifetime,
+  ]
+}
+
+run "nested_service_account_token_of_two_years_warns" {
+  command = plan
+
+  variables {
+    projects = { tools = { service_accounts = { bot = { tokens = { ci = { scopes = ["read_api"], expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "17520h")) } } } } } }
+  }
+
+  expect_failures = [
+    check.token_lifetime,
+  ]
+}
+
+run "long_rotating_group_access_token_warns" {
+  command = plan
+
+  variables {
+    gitlab_group_access_token = {
+      bot = { groups = ["org/a"], name = "bot", access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 400, rotate_before_days = 30 } }
+    }
+  }
+
+  expect_failures = [
+    check.token_lifetime,
+  ]
+}
+
+run "long_rotating_project_access_token_warns" {
+  command = plan
+
+  variables {
+    projects = { tools = { access_tokens = { bot = { access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 400, rotate_before_days = 30 } } } } }
+  }
+
+  expect_failures = [
+    check.token_lifetime,
+  ]
+}
+
+run "long_rotating_service_account_token_warns" {
+  command = plan
+
+  variables {
+    groups = { platform = { service_accounts = { bot = { tokens = { ci = { scopes = ["read_api"], rotation_configuration = { expiration_days = 400, rotate_before_days = 30 } } } } } } }
+  }
+
+  expect_failures = [
+    check.token_lifetime,
+  ]
+}
+
 # Every guardrail-relevant setting at its safe value: no check may warn.
 run "clean_tree_raises_no_warning" {
   command = plan
@@ -203,6 +295,11 @@ run "clean_tree_raises_no_warning" {
         deploy_tokens = { pull = { expires_at = timeadd(timestamp(), "720h"), scopes = ["read_repository"] } }
         deploy_keys   = { gitops = { key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINotARealKeyOnlyForUnitTests ci@example", expires_at = timeadd(timestamp(), "720h") } }
         hooks         = { ci = { url = "https://ci.example.com/hook" } }
+        access_tokens = { bot = { access_level = "developer", scopes = ["read_api"], rotation_configuration = { expiration_days = 90, rotate_before_days = 14 } } }
+        service_accounts = {
+          release = { tokens = { dated = { scopes = ["read_api"], expires_at = formatdate("YYYY-MM-DD", timeadd(timestamp(), "720h")) }, rotating = { scopes = ["read_api"], rotation_configuration = { expiration_days = 365, rotate_before_days = 30 } } } }
+        }
+        ci = { hardening_enabled = true }
       }
       tools = { branches = {}, visibility = "internal" }
     }

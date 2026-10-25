@@ -89,6 +89,25 @@ output "project_deploy_tokens" {
   sensitive = true
 }
 
+output "service_accounts" {
+  description = "Service accounts keyed like the service_accounts input, or \"<owner key>:<name>\" for created groups and projects: id (the service account's user ID), username and email"
+  value = merge(
+    { for k, sa in gitlab_group_service_account.this : k => { id = sa.service_account_id, username = sa.username, email = sa.email } },
+    { for k, sa in gitlab_project_service_account.this : k => { id = sa.service_account_id, username = sa.username, email = sa.email } },
+  )
+}
+
+output "service_account_tokens" {
+  description = "Service account tokens keyed \"<service account key>:<token name>\": token and expires_at. Sensitive."
+  value = merge([
+    for tokens in [
+      gitlab_group_service_account_access_token.this, gitlab_group_service_account_access_token.rotating,
+      gitlab_project_service_account_access_token.this, gitlab_project_service_account_access_token.rotating,
+    ] : { for k, t in tokens : k => { token = t.token, expires_at = t.expires_at } }
+  ]...)
+  sensitive = true
+}
+
 output "group_variables_ids" {
   description = "IDs of the group CI/CD variables, in the form <group>:<key>:<environment_scope>"
   value       = [for k, v in gitlab_group_variable.this : v.id]
@@ -132,5 +151,11 @@ output "gitlab_runner_tokens" {
 output "pipeline_trigger_tokens" {
   description = "Pipeline trigger tokens keyed \"<project key>:<description>\", for triggering the project's pipelines through the API. Sensitive."
   value       = { for k, v in gitlab_pipeline_trigger.this : k => v.token }
+  sensitive   = true
+}
+
+output "kubernetes_agent_tokens" {
+  description = "Kubernetes agent tokens keyed \"<project key>:<agent name>\", for installing the agent in the cluster. Sensitive."
+  value       = { for k, t in gitlab_cluster_agent_token.this : k => t.token }
   sensitive   = true
 }

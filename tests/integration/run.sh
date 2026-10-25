@@ -59,6 +59,23 @@ api_as() {
 }
 api() { api_as GITLAB_TOKEN "$1"; }
 
+# PUT on the API with the owner token and form fields from stdin.
+api_put() {
+  local path=$1
+  { printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_TOKEN"; cat; } | curl --config - -fsS -X PUT "$api_url/$path" >/dev/null
+}
+
+# Retries a command for up to 30 seconds: new tokens and memberships can take
+# a few seconds to be accepted.
+retry() {
+  local try
+  for try in 1 2 3 4 5 6; do
+    "$@" && return 0
+    [ "$try" -lt 6 ] && sleep 5
+  done
+  return 1
+}
+
 # Reads field $3 of key $2 of the sensitive output $1 into stdout, for capture.
 output_field() {
   tofu -chdir="$dir" output -json "$1" | python3 -I -c '
@@ -193,6 +210,81 @@ print("form = \"token=%s\"\nform = \"ref=it-no-such-ref\"" % json.load(sys.stdin
     curl --config - -s -o /dev/null -w '%{http_code}' "$api_url/projects/$api_id/trigger/pipeline")
   [ "$code" = 400 ] || fail "trigger token check (HTTP $code)"
   log "pipeline trigger token authenticates"
+
+  # Service accounts: each token reads team/api through its membership.
+  local sa_key
+  for sa_key in "it-$suffix:ci" "$tree/team:deployer:ci" "$tree/team/api:release:ci"; do
+    # shellcheck disable=SC2034 # read by api_as through ${!var}
+    SA_TOKEN=$(output_field service_account_tokens "$sa_key" token)
+    retry api_as SA_TOKEN "projects/$api_id" >/dev/null || fail "service account token $sa_key cannot read team/api"
+  done
+  log "standalone, subgroup and project service accounts read team/api through their memberships"
+
+  api "projects/$api_id" | python3 -I -c '
+import json, sys
+p = json.load(sys.stdin)
+want = {"public_jobs": False, "ci_pipeline_variables_minimum_override_role": "no_one_allowed", "protect_merge_request_pipelines": True,
+        "ci_separated_caches": True, "ci_forward_deployment_enabled": True, "ci_push_repository_for_job_token_allowed": False,
+        "allow_merge_on_skipped_pipeline": False, "ci_delete_pipelines_in_seconds": 31536000}
+bad = {k: p.get(k) for k, v in want.items() if p.get(k) != v}
+assert not bad, "hardened CI settings: %s" % bad' || fail "hardened CI settings"
+  log "hardened CI settings read back"
+
+  api "projects/$api_id/freeze_periods" | python3 -I -c '
+import json, sys
+assert [f["freeze_start"] for f in json.load(sys.stdin)] == ["0 18 * * 5"], "freeze period"' || fail "freeze period"
+  api "projects/$api_id/secure_files" | python3 -I -c '
+import json, sys
+assert [f["name"] for f in json.load(sys.stdin)] == ["it.txt"], "secure file"' || fail "secure file"
+  log "freeze period and secure file exist"
+
+  local runner_id
+  runner_id=$(tofu -chdir="$dir" output -json gitlab_runners | python3 -I -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]]["id"])' "$tree/team/api:build")
+  api "projects/$tools_id/runners" | python3 -I -c '
+import json, sys
+assert int(sys.argv[1]) in [r["id"] for r in json.load(sys.stdin)], "runner not enabled in tools"' "$runner_id" || fail "runner enablement"
+  api "projects/$tools_id/deploy_keys" | python3 -I -c '
+import json, sys
+keys = [k for k in json.load(sys.stdin) if k["title"] == "it"]
+assert keys and not keys[0]["can_push"], "deploy key not enabled read-only in tools"' || fail "deploy key enablement"
+  log "team/api runner and deploy key enabled in tools"
+
+  api "projects/$api_id/packages/protection/rules" | python3 -I -c '
+import json, sys
+r = json.load(sys.stdin)
+assert [(x["package_type"], x["package_name_pattern"]) for x in r] == [("npm", "@it/*")], "package rules: %s" % r' || fail "package protection rule"
+  api "projects/$api_id/registry/protection/repository/rules" | python3 -I -c '
+import json, sys
+r = json.load(sys.stdin)
+assert [x["repository_path_pattern"] for x in r] == [sys.argv[1] + "*"], "container rules: %s" % r' "$parent/$tree/team/api" || fail "container protection rule"
+  log "package and container repository protection rules exist (tag rules: GraphQL only, covered by apply and the empty plan)"
+
+  local ref
+  for ref in main develop; do
+    api "projects/$api_id/repository/files/CODEOWNERS?ref=$ref" >/dev/null || fail "CODEOWNERS missing on $ref"
+  done
+  log "managed CODEOWNERS is on main and develop"
+
+  api "projects/$api_id/cluster_agents" | python3 -I -c '
+import json, sys
+assert [a["name"] for a in json.load(sys.stdin)] == ["it"], "agent"' || fail "agent registration"
+  api "projects/$api_id/repository/files/.gitlab%2Fagents%2Fit%2Fconfig.yaml/raw?ref=main" | grep -qF "\"$parent/$tree\"" ||
+    fail "agent config.yaml does not name the tree's root group"
+  tofu -chdir="$dir" output -json kubernetes_agent_tokens | python3 -I -c '
+import json, sys
+assert json.load(sys.stdin)[sys.argv[1]].startswith("glagent-"), "agent token"' "$tree/team/api:it" || fail "agent token"
+  log "Kubernetes agent registered with its token and ci_access configuration"
+}
+
+# Owner mode, after the empty second plan: an edit of the seeded file in the
+# repository must leave the plan empty.
+check_seeded_file() {
+  local api_id
+  api_id=$(tofu -chdir="$dir" output -json projects | python3 -I -c 'import json,sys; print(json.load(sys.stdin)[sys.argv[1]]["id"])' "it-$suffix/team/api")
+  printf 'form = "branch=main"\nform = "content=Edited by a developer"\nform = "commit_message=Edit the seeded file"\n' |
+    api_put "projects/$api_id/repository/files/docs%2FREADME.md" || fail "cannot edit the seeded file"
+  second_plan_empty
+  log "an edit of the seeded file leaves the plan empty"
 }
 
 run_apply_modes() {
@@ -276,6 +368,7 @@ assert json.load(sys.stdin)["runner"].startswith("glrt-"), "runner token"' || fa
   [ "$mode" != owner ] || check_tree
 
   second_plan_empty
+  [ "$mode" != owner ] || check_seeded_file
 
   tofu -chdir="$dir" destroy -auto-approve -no-color >/dev/null
   destroyed=true

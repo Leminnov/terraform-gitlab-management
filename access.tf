@@ -26,6 +26,8 @@ resource "gitlab_group_access_token" "this" {
   expires_at   = each.value.expires_at
   access_level = each.value.access_level
   scopes       = each.value.scopes
+  # Exactly one of expires_at and rotation_configuration is set (variables.tf).
+  rotation_configuration = each.value.rotation_configuration
 }
 
 resource "gitlab_project_access_token" "this" {
@@ -36,6 +38,8 @@ resource "gitlab_project_access_token" "this" {
   expires_at   = each.value.expires_at
   access_level = each.value.access_level
   scopes       = each.value.scopes
+  # Exactly one of expires_at and rotation_configuration is set (variables.tf).
+  rotation_configuration = each.value.rotation_configuration
 }
 
 resource "gitlab_project_deploy_token" "this" {
@@ -92,4 +96,14 @@ resource "gitlab_project_share_group" "this" {
   group_id     = each.value.group_id
   group_access = each.value.access_level
   expires_at   = each.value.expires_at
+}
+
+# Read-only: a writable key shared across projects would be an undeclared
+# write path (check.deploy_key_write_access covers the owning project's key).
+resource "gitlab_deploy_key_enable" "this" {
+  for_each = local.project_deploy_key_enablements
+
+  project  = each.value.project
+  key_id   = each.value.key_id
+  can_push = false
 }

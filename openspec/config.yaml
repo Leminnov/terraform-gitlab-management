@@ -45,8 +45,10 @@ context: |
   each group and project, and manages GitLab CI/CD settings on existing ones:
   group and project CI/CD variables, group deploy tokens, pipeline schedules
   and their variables, runners (gitlab_user_runner), and group and project
-  access tokens. The standalone variable, deploy-token and access-token inputs
-  fan out over a `groups` / `projects` list, one resource per (entry, target). Published on
+  access tokens, plus service accounts (standalone in an existing group, or
+  nested in created groups and projects). The standalone variable,
+  deploy-token and access-token inputs fan out over a `groups` / `projects`
+  list, one resource per (entry, target). Published on
   GitLab (leminnov/terraform/modules/gitlab-management); consumers pin a git
   tag (?ref=vX.Y.Z). Apache-2.0.
 
@@ -57,7 +59,8 @@ context: |
   Layout: resources, each labelled `this` (groups: level_1 to level_7, one
   block per depth), live in themed files listed in the header of main.tf:
   groups.tf, projects.tf, access.tf (with the moved block from
-  gitlab_deploy_token), ci.tf, metadata.tf, premium.tf; locals.tf flattens the
+  gitlab_deploy_token), service_accounts.tf, ci.tf, registry.tf, files.tf,
+  metadata.tf, premium.tf; locals.tf flattens the
   fan-out inputs into maps keyed "<entry>_<target>" and merges the objects
   nested in groups and projects into the same maps, keyed
   "<owner key>:<item key>" (standalone keys may not contain ":"); checks.tf
@@ -66,7 +69,8 @@ context: |
   defaults, validation blocks for enums, formats and non-empty lists, enum
   sets in a locals block at its top); outputs.tf exposes IDs, summaries and,
   marked sensitive, tokens (never a variable value). tests/*.tftest.hcl (main,
-  groups, projects, nested, metadata, premium, guardrails) = unit tests with
+  groups, projects, nested, service_accounts, ci, registry, files, metadata,
+  premium, guardrails) = unit tests with
   mock_provider "gitlab", numeric mock IDs and command = plan (no server).
   tests/integration/ = gitlab.com sandbox fixture run by run.sh in owner,
   least and upgrade (from v12.0.0) modes; it checks redaction, server-side
@@ -80,7 +84,10 @@ context: |
   webhook tokens reach the provider through sensitive() because for_each
   iterates the inputs (DEVIATION(terraform-variables)); they and every token
   GitLab creates land in state, listed in SECURITY.md; Premium-only settings
-  default to {} or null so a Free namespace plans none of them; groups and
+  default to {} or null so a Free namespace plans none of them; CI hardening
+  is opt-in (ci.hardening_enabled = false by default); service-account tokens
+  live in two blocks per type (dated and rotating) because provider 19.5
+  crashes validating an unknown rotation_configuration; groups and
   projects are archived on destroy unless archive_on_destroy = false;
   pre-commit-terraform runs v1.109.3, above the terraform store's v1.109.1
   (DEVIATION(terraform-repo-precommit)), and the pre-commit job ubuntu:26.04
@@ -106,7 +113,7 @@ rules:
     - Classify the change as semver major/minor/patch per terraform-versioning and list every input or output whose type, default or meaning changes
     - State what lands in state; a new secret-bearing input must follow terraform-security (write-only argument plus a *_wo_version companion), or justify why the provider offers none
   specs:
-    - Reuse the capability directories under openspec/specs (module-contract, groups, projects, repository-protection, access-management, ci-variables, deploy-tokens, deploy-keys, access-tokens, pipeline-schedules, runners, project-ci-settings, labels-and-badges, webhooks, premium-features, security-guardrails); add a new one only for a new module area
+    - Reuse the capability directories under openspec/specs (module-contract, groups, projects, repository-protection, access-management, service-accounts, ci-variables, deploy-tokens, deploy-keys, access-tokens, pipeline-schedules, runners, project-ci-settings, registry-protection, repository-files, kubernetes-agents, labels-and-badges, webhooks, premium-features, security-guardrails); add a new one only for a new module area
     - Write requirements against the module's observable contract - input shape, plan-time validation errors, resources and arguments produced, outputs, empty second plan - not against provider internals
     - Give every validation block a scenario with the rejected input, and every check block a scenario with the warned input
   design:

@@ -1,6 +1,7 @@
 # CI/CD objects: group and project variables, pipeline schedules and their
-# variables, runners, and the environments, pipeline triggers and job token
-# allowlists of created projects.
+# variables, runners, and the environments, pipeline triggers, job token
+# allowlists, freeze periods, secure files and CI/CD catalog flag of created
+# projects.
 
 # DEVIATION(terraform-variables): the value input cannot be sensitive = true
 # because for_each iterates it, and the provider has no value_wo; sensitive()
@@ -65,6 +66,16 @@ resource "gitlab_user_runner" "this" {
   paused          = each.value.paused
   untagged        = each.value.untagged
   locked          = each.value.locked
+
+  # DEVIATION(terraform-code-style): ignore_changes on an attribute the module
+  # owns. Provider 19.5 reads project_id back as the first project gitlab.com
+  # lists for the runner, which after gitlab_project_runner_enablement can be
+  # another project, and project_id forces replacement. A nested runner's
+  # project is part of its key, so project_id never legitimately changes; to
+  # move a standalone runner, change its key or apply -replace.
+  lifecycle {
+    ignore_changes = [project_id]
+  }
 }
 
 resource "gitlab_project_environment" "this" {
@@ -93,4 +104,54 @@ resource "gitlab_project_job_token_scopes" "this" {
   enabled            = true
   target_project_ids = each.value.target_project_ids
   target_group_ids   = each.value.target_group_ids
+}
+
+resource "gitlab_project_freeze_period" "this" {
+  for_each = local.project_freeze_periods
+
+  project       = each.value.project
+  freeze_start  = each.value.freeze_start
+  freeze_end    = each.value.freeze_end
+  cron_timezone = each.value.cron_timezone
+}
+
+# DEVIATION(terraform-variables): secure file contents cannot come from a
+# sensitive = true input because for_each iterates it, and the provider has no
+# write-only argument; sensitive() keeps them out of plan output. They still
+# land in state (SECURITY.md).
+resource "gitlab_project_secure_file" "this" {
+  for_each = local.project_secure_files
+
+  project = each.value.project
+  name    = each.value.name
+  content = sensitive(each.value.content)
+}
+
+resource "gitlab_project_cicd_catalog" "this" {
+  for_each = { for pk, pr in var.projects : pk => local.project_ids[pk] if pr.cicd_catalog }
+
+  project = each.value
+  enabled = true
+}
+
+resource "gitlab_project_runner_enablement" "this" {
+  for_each = local.project_runner_enablements
+
+  project   = each.value.project
+  runner_id = each.value.runner_id
+}
+
+resource "gitlab_cluster_agent" "this" {
+  for_each = local.kubernetes_agents
+
+  project = each.value.project
+  name    = each.value.name
+}
+
+resource "gitlab_cluster_agent_token" "this" {
+  for_each = local.kubernetes_agents
+
+  project  = each.value.project
+  agent_id = gitlab_cluster_agent.this[each.key].agent_id
+  name     = each.value.name
 }

@@ -56,7 +56,13 @@ module "gitlab_management" {
   }
 
   projects = {
-    "platform/docs" = { description = "Platform documentation" }
+    "platform/docs" = {
+      description = "Platform documentation"
+      # Opt-in CI hardening, a pipeline retention of 90 days and a weekend
+      # deploy freeze.
+      ci             = { hardening_enabled = true, delete_pipelines_in_seconds = 7776000 }
+      freeze_periods = { weekend = { freeze_start = "0 18 * * 5", freeze_end = "0 6 * * 1" } }
+    }
     "platform/backend/api" = {
       topics = ["api"]
 
@@ -65,7 +71,28 @@ module "gitlab_management" {
       deploy_tokens = { pull = { expires_at = "${var.token_expires_at}T00:00:00Z", scopes = ["read_repository"] } }
       deploy_keys   = { gitops = { key = var.deploy_key, expires_at = "${var.token_expires_at}T00:00:00Z" } }
       environments  = { production = { tier = "production" } }
-      members       = { reviewer = { user_id = var.reviewer_user_id, access_level = "reporter", expires_at = var.token_expires_at } }
+      members = {
+        reviewer = { user_id = var.reviewer_user_id, access_level = "reporter", expires_at = var.token_expires_at }
+        release  = { service_account = "platform/backend/api:release", access_level = "developer" }
+      }
+
+      # Governed files: CODEOWNERS owned by Terraform, the pipeline seeded once
+      # and then owned by the developers. A Kubernetes agent whose cluster the
+      # pipelines of the platform group can reach.
+      files = {
+        CODEOWNERS       = { content = "* @my-org/platform\n" }
+        ".gitlab-ci.yml" = { content = "include:\n  - project: my-org/ci-templates\n    file: terraform.yml\n", managed = false }
+      }
+      kubernetes_agents = { prod = { ci_access = { groups = ["platform"] } } }
+
+      # Only maintainers push release packages and v* images.
+      package_protection_rules       = { npm = { package_type = "npm", package_name_pattern = "@my-org/*" } }
+      container_tag_protection_rules = { release = { tag_name_pattern = "^v[0-9]+" } }
+
+      # A project service account (Free tier) with a token rotated by apply.
+      service_accounts = {
+        release = { tokens = { ci = { scopes = ["write_repository"], rotation_configuration = { expiration_days = 90, rotate_before_days = 14 } } } }
+      }
     }
   }
 

@@ -7,6 +7,34 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+### Added
+
+- Plan-time warnings `public_jobs` (explicit `ci.public_jobs = true`) and `job_token_push` (`ci.push_repository_for_job_token_allowed = true`). `token_lifetime` also covers service-account tokens and any `rotation_configuration` whose `expiration_days` is above 366.
+- Premium settings, off unless set: `projects[*].target_branch_rules` (for example `"feature/*" = "develop"`), `ci.merge_pipelines_enabled` and `ci.merge_trains_enabled`, `ci.restrict_pipeline_cancellation_role`, `ci.allow_pipeline_trigger_approve_deployment`, and `container_tag_protection_rules[*].immutable` (Ultimate).
+- `projects[*].files` commits files to the default branch, before the module creates other branches. A file is managed (the default: Terraform owns it and reverts edits) or seeded with `managed = false` (committed once, then owned by the developers).
+- `projects[*].kubernetes_agents` registers GitLab agents for Kubernetes, each with a token (new sensitive output `kubernetes_agent_tokens`). Its `ci_access` (created groups and projects by key, existing ones by full path) is written to the agent's managed `.gitlab/agents/<name>/config.yaml`.
+- Registry protection on created projects:
+  - `package_protection_rules` (push by maintainers by default);
+  - `container_protection_rules`, whose `path_pattern` is appended to the project's full path;
+  - `container_tag_protection_rules` (protected container tags; `immutable = true` needs Ultimate);
+  - `container_expiration_policy`, off unless set because cleanup deletes images.
+- Cross-project sharing: `projects[*].enabled_runners` enables an unlocked project runner of another created project (`"<project key>:<runner name>"`), and `enabled_runner_ids` an existing runner by ID. `enabled_deploy_keys` and `enabled_deploy_key_ids` do the same for deploy keys, always read-only.
+- Opt-in CI hardening on created projects: `projects[*].ci.hardening_enabled` (default `false`, so existing projects do not change). When on, it sends `public_jobs = false`, pipeline variable overrides by no one, protected merge request pipelines, separate caches for protected branches, forward deployment, no job-token pushes and no merge on skipped pipelines. Each of these can also be set on its own, and an explicit value wins.
+- Other CI settings in `projects[*].ci`, each sent only when set: `config_path`, `auto_cancel_pending_pipelines`, `build_timeout`, `default_git_depth`, `delete_pipelines_in_seconds`, `id_token_sub_claim_components` (the OIDC `sub` claim), `group_runners_enabled` and `shared_runners_enabled`. Also `groups[*].shared_runners_setting`.
+- `projects[*].freeze_periods` (deploy freezes), `projects[*].secure_files` (CI/CD secure files, text content, redacted in plans and stored in state) and `projects[*].cicd_catalog`.
+- `rotation_configuration = { expiration_days, rotate_before_days }` on group and project access tokens, standalone and nested: the first apply within `rotate_before_days` of expiry rotates the token. `expires_at` becomes optional, and exactly one of the two is required.
+- Service accounts (GitLab 18+, Free tier included) at three levels:
+  - `service_accounts`, in an existing top-level group or intermediate subgroup;
+  - `groups[*].service_accounts`, in a created subgroup;
+  - `projects[*].service_accounts`, in a created project.
+
+  Each account has `tokens` with `scopes` (administrator scopes rejected) and exactly one of `expires_at` or `rotation_configuration`. Accounts get access through `members[*].service_account`, checked at plan against GitLab's invitation scope; `members[*].user_id` becomes optional. New outputs `service_accounts` and `service_account_tokens` (sensitive). Dated and rotating tokens live in separate resource blocks, because provider 19.5 crashes validating an unknown `rotation_configuration`.
+
+### Fixed
+
+- A project runner shared with another project through `enabled_runners` was recreated on every plan. Provider 19.5 reads its `project_id` back as the other project once that project has the lower ID, so the module now ignores changes to a runner's `project_id`. To move a standalone runner to another project, change its key or apply `-replace`.
+
+
 ## [13.0.0] - 2026-10-23
 
 ### Changed (breaking)

@@ -45,6 +45,19 @@ run "premium_is_off_by_default" {
     condition     = length(local.project_protected_branches) == 4 && alltrue([for b in values(local.project_protected_branches) : b.code_owner_approval_required == null])
     error_message = "code_owner_approval_required must not be sent unless set."
   }
+  assert {
+    condition = alltrue([
+      length(gitlab_project_target_branch_rule.this) == 0,
+      length(gitlab_project_container_tag_protection.this) == 0,
+      alltrue([for p in values(local.project_args) : alltrue([
+        p.ci.merge_pipelines_enabled == null,
+        p.ci.merge_trains_enabled == null,
+        p.ci.restrict_pipeline_cancellation_role == null,
+        p.ci.allow_pipeline_trigger_approve_deployment == null,
+      ])]),
+    ])
+    error_message = "No target branch rule, Premium CI argument or immutable tag rule may be planned unless set."
+  }
 }
 
 run "approval_rule_defaults" {
@@ -225,5 +238,81 @@ run "group_hook_signing_token_format_is_rejected" {
 
   expect_failures = [
     var.groups,
+  ]
+}
+
+# ---------------------------------------------------------------------------
+# Merge trains, target branch rules, cancellation role, deployment approval
+# ---------------------------------------------------------------------------
+
+run "merge_train_and_pipeline_controls" {
+  command = plan
+
+  variables {
+    projects = {
+      "platform/api" = {
+        ci = {
+          merge_pipelines_enabled                   = true
+          merge_trains_enabled                      = true
+          restrict_pipeline_cancellation_role       = "maintainer"
+          allow_pipeline_trigger_approve_deployment = false
+        }
+        target_branch_rules = { "feature/*" = "develop", "hotfix/*" = "main" }
+      }
+    }
+  }
+
+  assert {
+    condition = alltrue([
+      gitlab_project.this["platform/api"].merge_pipelines_enabled == true,
+      gitlab_project.this["platform/api"].merge_trains_enabled == true,
+      gitlab_project.this["platform/api"].ci_restrict_pipeline_cancellation_role == "maintainer",
+      gitlab_project.this["platform/api"].allow_pipeline_trigger_approve_deployment == false,
+    ])
+    error_message = "The Premium CI settings must be sent as given."
+  }
+  assert {
+    condition = alltrue([
+      toset(keys(gitlab_project_target_branch_rule.this)) == toset(["platform/api:feature/*", "platform/api:hotfix/*"]),
+      gitlab_project_target_branch_rule.this["platform/api:feature/*"].target_branch_name == "develop",
+      gitlab_project_target_branch_rule.this["platform/api:feature/*"].source_branch_pattern == "feature/*",
+    ])
+    error_message = "Target branch rules must be keyed \"<project key>:<pattern>\" with their target."
+  }
+}
+
+run "merge_train_without_merge_pipelines_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = { ci = { merge_trains_enabled = true } } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "unknown_cancellation_role_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = { ci = { restrict_pipeline_cancellation_role = "owner" } } }
+  }
+
+  expect_failures = [
+    var.projects,
+  ]
+}
+
+run "empty_target_branch_is_rejected" {
+  command = plan
+
+  variables {
+    projects = { "platform/api" = { target_branch_rules = { "bug/*" = "" } } }
+  }
+
+  expect_failures = [
+    var.projects,
   ]
 }

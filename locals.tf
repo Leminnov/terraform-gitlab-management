@@ -61,6 +61,8 @@ locals {
         expires_at   = v.expires_at
         access_level = v.access_level
         scopes       = v.scopes
+        # Rotated tokens get their expiry from GitLab.
+        rotation_configuration = v.rotation_configuration
       }
     }
     ], [
@@ -77,6 +79,8 @@ locals {
         expires_at   = v.expires_at
         access_level = v.access_level
         scopes       = v.scopes
+        # Rotated tokens get their expiry from GitLab.
+        rotation_configuration = v.rotation_configuration
       }
     }
     ], [
@@ -182,6 +186,17 @@ locals {
       # The provider rejects both arguments together, even when one is false.
       archive_on_destroy            = v.archive_on_destroy ? true : null
       permanently_delete_on_destroy = v.archive_on_destroy ? null : v.permanently_delete_on_destroy
+      # Each security setting: the explicit value, else the hardened one when
+      # hardening is on, else null (nothing sent, GitLab's value kept).
+      ci = merge(v.ci, {
+        public_jobs                              = v.ci.public_jobs != null ? v.ci.public_jobs : (v.ci.hardening_enabled ? false : null)
+        pipeline_variables_minimum_override_role = v.ci.pipeline_variables_minimum_override_role != null ? v.ci.pipeline_variables_minimum_override_role : (v.ci.hardening_enabled ? "no_one_allowed" : null)
+        protect_merge_request_pipelines          = v.ci.protect_merge_request_pipelines != null ? v.ci.protect_merge_request_pipelines : (v.ci.hardening_enabled ? true : null)
+        separated_caches                         = v.ci.separated_caches != null ? v.ci.separated_caches : (v.ci.hardening_enabled ? true : null)
+        forward_deployment_enabled               = v.ci.forward_deployment_enabled != null ? v.ci.forward_deployment_enabled : (v.ci.hardening_enabled ? true : null)
+        push_repository_for_job_token_allowed    = v.ci.push_repository_for_job_token_allowed != null ? v.ci.push_repository_for_job_token_allowed : (v.ci.hardening_enabled ? false : null)
+        allow_merge_on_skipped_pipeline          = v.ci.allow_merge_on_skipped_pipeline != null ? v.ci.allow_merge_on_skipped_pipeline : (v.ci.hardening_enabled ? false : null)
+      })
     })
   }
 
@@ -199,15 +214,61 @@ locals {
     }
   ]...)
 
+  # Service accounts: standalone ones in an existing group keyed "<name>",
+  # those of created groups and projects keyed "<owner key>:<name>".
+  group_service_accounts = merge(
+    { for k, sa in var.service_accounts : k => { group = sa.group, name = coalesce(sa.name, k), username = sa.username, email = sa.email } },
+    merge([
+      for gk, g in var.groups : {
+        for n, sa in g.service_accounts : "${gk}:${n}" => { group = local.group_ids[gk], name = coalesce(sa.name, n), username = sa.username, email = sa.email }
+      }
+    ]...),
+  )
+
+  project_service_accounts = merge([
+    for pk, pr in var.projects : {
+      for n, sa in pr.service_accounts : "${pk}:${n}" => { project = local.project_ids[pk], name = coalesce(sa.name, n), username = sa.username, email = sa.email }
+    }
+  ]...)
+
+  # Tokens keyed "<service account key>:<token name>".
+  group_service_account_tokens = merge(concat(
+    [for k, sa in var.service_accounts : { for t, tok in sa.tokens : "${k}:${t}" => merge(tok, { account = k, name = t }) }],
+    flatten([
+      for gk, g in var.groups : [
+        for n, sa in g.service_accounts : { for t, tok in sa.tokens : "${gk}:${n}:${t}" => merge(tok, { account = "${gk}:${n}", name = t }) }
+      ]
+    ]),
+  )...)
+
+  project_service_account_tokens = merge(flatten([
+    for pk, pr in var.projects : [
+      for n, sa in pr.service_accounts : { for t, tok in sa.tokens : "${pk}:${n}:${t}" => merge(tok, { account = "${pk}:${n}", name = t }) }
+    ]
+  ])...)
+
+  service_account_user_ids = merge(
+    { for k, sa in gitlab_group_service_account.this : k => tonumber(sa.service_account_id) },
+    { for k, sa in gitlab_project_service_account.this : k => tonumber(sa.service_account_id) },
+  )
+
+  # A member is a user ID or a service account managed here (validated in
+  # variables.tf against GitLab's invitation scope).
   group_memberships = merge([
     for gk, g in var.groups : {
-      for name, m in g.members : "${gk}:${name}" => merge(m, { group_id = tonumber(local.group_ids[gk]) })
+      for name, m in g.members : "${gk}:${name}" => merge(m, {
+        group_id = tonumber(local.group_ids[gk])
+        user_id  = m.service_account == null ? m.user_id : local.service_account_user_ids[m.service_account]
+      })
     }
   ]...)
 
   project_memberships = merge([
     for pk, pr in var.projects : {
-      for name, m in pr.members : "${pk}:${name}" => merge(m, { project = local.project_ids[pk] })
+      for name, m in pr.members : "${pk}:${name}" => merge(m, {
+        project = local.project_ids[pk]
+        user_id = m.service_account == null ? m.user_id : local.service_account_user_ids[m.service_account]
+      })
     }
   ]...)
 
@@ -228,6 +289,88 @@ locals {
       })
     }
   ]...)
+
+  project_freeze_periods = merge([
+    for pk, pr in var.projects : {
+      for label, f in pr.freeze_periods : "${pk}:${label}" => merge(f, { project = local.project_ids[pk] })
+    }
+  ]...)
+
+  project_secure_files = merge([
+    for pk, pr in var.projects : {
+      for name, content in pr.secure_files : "${pk}:${name}" => { project = local.project_ids[pk], name = name, content = content }
+    }
+  ]...)
+
+  # Runners and deploy keys of other created projects ("<project key>:<source
+  # key>") or existing ones by ID, enabled in a project.
+  project_runner_enablements = merge(flatten([
+    for pk, pr in var.projects : [
+      { for e in pr.enabled_runners : "${pk}:${e}" => { project = local.project_ids[pk], runner_id = tonumber(gitlab_user_runner.this[e].id) } },
+      { for id in pr.enabled_runner_ids : "${pk}:${id}" => { project = local.project_ids[pk], runner_id = id } },
+    ]
+  ])...)
+
+  project_deploy_key_enablements = merge(flatten([
+    for pk, pr in var.projects : [
+      { for e in pr.enabled_deploy_keys : "${pk}:${e}" => { project = local.project_ids[pk], key_id = tostring(gitlab_deploy_key.this[e].deploy_key_id) } },
+      { for id in pr.enabled_deploy_key_ids : "${pk}:${id}" => { project = local.project_ids[pk], key_id = tostring(id) } },
+    ]
+  ])...)
+
+  package_protection_rules = merge([
+    for pk, pr in var.projects : {
+      for label, r in pr.package_protection_rules : "${pk}:${label}" => merge(r, { project = local.project_ids[pk] })
+    }
+  ]...)
+
+  container_protection_rules = merge([
+    for pk, pr in var.projects : {
+      for label, r in pr.container_protection_rules : "${pk}:${label}" => merge(r, { project = local.project_ids[pk], project_key = pk })
+    }
+  ]...)
+
+  container_tag_protection_rules = merge([
+    for pk, pr in var.projects : {
+      for label, r in pr.container_tag_protection_rules : "${pk}:${label}" => merge(r, { project = local.project_ids[pk] })
+    }
+  ]...)
+
+  kubernetes_agents = merge([
+    for pk, pr in var.projects : {
+      for name, a in pr.kubernetes_agents : "${pk}:${name}" => { project = local.project_ids[pk], name = name }
+    }
+  ]...)
+
+  # Files committed to created projects, keyed "<project key>:<path>": the
+  # caller's files, plus the managed config.yaml of each agent with ci_access,
+  # listing the authorised groups and projects by full path.
+  repository_files = merge(concat(
+    [
+      for pk, pr in var.projects : {
+        for path, f in pr.files : "${pk}:${path}" => merge(f, { project_key = pk, file_path = path })
+      }
+    ],
+    [
+      for pk, pr in var.projects : {
+        for name, a in pr.kubernetes_agents : "${pk}:.gitlab/agents/${name}/config.yaml" => {
+          project_key = pk
+          file_path   = ".gitlab/agents/${name}/config.yaml"
+          managed     = true
+          encoding    = "text"
+          executable  = false
+          content = yamlencode({
+            ci_access = {
+              for kind, ids in {
+                groups   = sort(concat([for g in a.ci_access.groups : local.created_groups[g].full_path], tolist(a.ci_access.group_paths)))
+                projects = sort(concat([for p in a.ci_access.projects : gitlab_project.this[p].path_with_namespace], tolist(a.ci_access.project_paths)))
+              } : kind => [for id in ids : { id = id }] if length(ids) > 0
+            }
+          })
+        } if length(a.ci_access.groups) + length(a.ci_access.group_paths) + length(a.ci_access.projects) + length(a.ci_access.project_paths) > 0
+      }
+    ],
+  )...)
 
   project_environments = merge([
     for pk, pr in var.projects : {
@@ -296,6 +439,12 @@ locals {
 
   project_mr_approvals = { for pk, pr in var.projects : pk => merge(pr.merge_request_approvals, { project = local.project_ids[pk] }) if pr.merge_request_approvals != null }
   project_push_rules   = { for pk, pr in var.projects : pk => merge(pr.push_rules, { project = local.project_ids[pk] }) if pr.push_rules != null }
+
+  project_target_branch_rules = merge([
+    for pk, pr in var.projects : {
+      for pattern, target in pr.target_branch_rules : "${pk}:${pattern}" => { project = local.project_ids[pk], source_branch_pattern = pattern, target_branch_name = target }
+    }
+  ]...)
 
   project_protected_environments = merge([
     for pk, pr in var.projects : {
