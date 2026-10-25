@@ -42,6 +42,11 @@ resource "gitlab_project" "this" {
   ci_id_token_sub_claim_components            = each.value.ci.id_token_sub_claim_components
   group_runners_enabled                       = each.value.ci.group_runners_enabled
   shared_runners_enabled                      = each.value.ci.shared_runners_enabled
+  # Premium; null sends nothing.
+  merge_pipelines_enabled                   = each.value.ci.merge_pipelines_enabled
+  merge_trains_enabled                      = each.value.ci.merge_trains_enabled
+  ci_restrict_pipeline_cancellation_role    = each.value.ci.restrict_pipeline_cancellation_role
+  allow_pipeline_trigger_approve_deployment = each.value.ci.allow_pipeline_trigger_approve_deployment
 
   # Container cleanup, only when the caller sets a policy: deleting images is
   # never a default.

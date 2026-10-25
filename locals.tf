@@ -440,6 +440,12 @@ locals {
   project_mr_approvals = { for pk, pr in var.projects : pk => merge(pr.merge_request_approvals, { project = local.project_ids[pk] }) if pr.merge_request_approvals != null }
   project_push_rules   = { for pk, pr in var.projects : pk => merge(pr.push_rules, { project = local.project_ids[pk] }) if pr.push_rules != null }
 
+  project_target_branch_rules = merge([
+    for pk, pr in var.projects : {
+      for pattern, target in pr.target_branch_rules : "${pk}:${pattern}" => { project = local.project_ids[pk], source_branch_pattern = pattern, target_branch_name = target }
+    }
+  ]...)
+
   project_protected_environments = merge([
     for pk, pr in var.projects : {
       for name, e in pr.protected_environments : "${pk}:${name}" => merge(e, { project = local.project_ids[pk], environment = "${pk}:${name}" })

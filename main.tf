@@ -26,5 +26,6 @@
 #               gitlab_project_badge, gitlab_project_hook
 #   premium.tf  gitlab_project_approval_rule, gitlab_project_level_mr_approvals,
 #               gitlab_project_push_rules, gitlab_project_protected_environment,
-#               gitlab_group_hook (Premium, none planned unless set)
+#               gitlab_group_hook, gitlab_project_target_branch_rule (Premium,
+#               none planned unless set)
 #   checks.tf   plan-time guardrails (check blocks)

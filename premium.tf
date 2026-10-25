@@ -73,3 +73,11 @@ resource "gitlab_group_hook" "this" {
   token                   = sensitive(each.value.token)
   signing_token           = sensitive(each.value.signing_token)
 }
+
+resource "gitlab_project_target_branch_rule" "this" {
+  for_each = local.project_target_branch_rules
+
+  project               = each.value.project
+  source_branch_pattern = each.value.source_branch_pattern
+  target_branch_name    = each.value.target_branch_name
+}

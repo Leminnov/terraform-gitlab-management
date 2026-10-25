@@ -9,6 +9,7 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ### Added
 
+- Premium settings, off unless set: `projects[*].target_branch_rules` (for example `"feature/*" = "develop"`), `ci.merge_pipelines_enabled` and `ci.merge_trains_enabled`, `ci.restrict_pipeline_cancellation_role`, `ci.allow_pipeline_trigger_approve_deployment`, and `container_tag_protection_rules[*].immutable` (Ultimate).
 - `projects[*].files` commits files to the default branch, before the module creates other branches. A file is managed (the default: Terraform owns it and reverts edits) or seeded with `managed = false` (committed once, then owned by the developers).
 - `projects[*].kubernetes_agents` registers GitLab agents for Kubernetes, each with a token (new sensitive output `kubernetes_agent_tokens`). Its `ci_access` (created groups and projects by key, existing ones by full path) is written to the agent's managed `.gitlab/agents/<name>/config.yaml`.
 - Registry protection on created projects:

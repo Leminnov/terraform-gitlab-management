@@ -951,6 +951,7 @@ variable "projects" {
       - approval_rules          : Premium. Approval rules keyed by name: approvals_required (>= 0), user_ids, group_ids, applies_to_all_protected_branches (default true).
       - merge_request_approvals : Premium. When set: reset_approvals_on_push (default true), merge_requests_author_approval (default false), merge_requests_disable_committers_approval and disable_overriding_approvers_per_merge_request (default true).
       - push_rules              : Premium. When set: prevent_secrets, deny_delete_tag and member_check (default true), reject_unsigned_commits, commit_message_regex, branch_name_regex, author_email_regex, max_file_size (MB); null keeps GitLab's default (off, no limit).
+      - target_branch_rules     : Premium. Default merge request target per source branch pattern, for example { "feature/*" = "develop" }.
       - protected_environments  : Premium. Protected environments keyed by a name declared in environments: deploy_access_level (developer or maintainer (default)), required_approvals (null: deploys need no approval).
       - job_token_allowlist : When set, only the job tokens of this project and of the listed projects and groups (keys of projects / groups, or existing project_ids / group_ids) may access the project; null leaves GitLab's default.
   EOT
@@ -1165,6 +1166,7 @@ variable "projects" {
       deploy_access_level = optional(string, "maintainer")
       required_approvals  = optional(number)
     })), {})
+    target_branch_rules = optional(map(string), {})
     deploy_keys = optional(map(object({
       key        = string
       expires_at = optional(string)
@@ -1614,5 +1616,20 @@ variable "projects" {
   validation {
     condition     = alltrue(flatten([for o in values(var.projects) : [for name in keys(o.kubernetes_agents) : !contains(keys(o.files), ".gitlab/agents/${name}/config.yaml")]]))
     error_message = "files keys must not use .gitlab/agents/<name>/config.yaml for a declared kubernetes_agents entry (the module writes it)."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : !(v.ci.merge_trains_enabled == true) || v.ci.merge_pipelines_enabled == true])
+    error_message = "ci.merge_trains_enabled requires ci.merge_pipelines_enabled = true."
+  }
+
+  validation {
+    condition     = alltrue([for v in values(var.projects) : v.ci.restrict_pipeline_cancellation_role == null || contains(["developer", "maintainer", "no_one"], coalesce(v.ci.restrict_pipeline_cancellation_role, "-"))])
+    error_message = "ci.restrict_pipeline_cancellation_role must be one of: developer, maintainer, no_one."
+  }
+
+  validation {
+    condition     = alltrue(flatten([for o in values(var.projects) : [for pattern, target in o.target_branch_rules : trimspace(pattern) != "" && trimspace(target) != ""]]))
+    error_message = "target_branch_rules values must be non-empty branch names."
   }
 }

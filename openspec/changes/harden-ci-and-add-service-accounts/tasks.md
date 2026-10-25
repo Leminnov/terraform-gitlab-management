@@ -110,9 +110,9 @@
 
 ## 7. Premium and Ultimate additions (design 9)
 
-- [ ] 7.1 `projects[*].target_branch_rules` and `gitlab_project_target_branch_rule.this` in `premium.tf`; the Premium `ci` fields sent only when set; `immutable` on tag rules. Add the merge-train, cancellation-role and target-branch validations. Verify `tofu validate`.
-- [ ] 7.2 `tests/premium.tftest.hcl`: the off-by-default run extended (no target branch rule, no Premium `ci` argument, no immutable rule); one run per feature; one rejected run per validation. Verify `mise run test` and the mutation check.
-- [ ] 7.3 README Known Limitations: Premium list extended. CHANGELOG Added. Verify `pre-commit run -a`.
+- [x] 7.1 `projects[*].target_branch_rules` and `gitlab_project_target_branch_rule.this` in `premium.tf`; the Premium `ci` fields sent only when set; `immutable` on tag rules. Add the merge-train, cancellation-role and target-branch validations. Verify `tofu validate`.
+- [x] 7.2 `tests/premium.tftest.hcl`: the off-by-default run extended (no target branch rule, no Premium `ci` argument, no immutable rule); one run per feature; one rejected run per validation. Verify `mise run test` and the mutation check.
+- [x] 7.3 README Known Limitations: Premium list extended. CHANGELOG Added. Verify `pre-commit run -a`.
 
 ## 8. Guardrails (design 10)
 
