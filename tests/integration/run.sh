@@ -51,18 +51,22 @@ fail() {
   exit 1
 }
 
+# gitlab.com rate-limits Free users in bursts (HTTP 429). curl retries 429 and
+# 5xx, honouring Retry-After, so a burst does not fail the run.
+curl_api() { curl --retry 6 --retry-max-time 120 "$@"; }
+
 # GET on the API with the token held in the variable named $1; the header is
 # read from stdin, so the token is never in an argument list.
 api_as() {
   local var=$1 path=$2
-  printf 'header = "PRIVATE-TOKEN: %s"\n' "${!var}" | curl --config - -fsS "$api_url/$path"
+  printf 'header = "PRIVATE-TOKEN: %s"\n' "${!var}" | curl_api --config - -fsS "$api_url/$path"
 }
 api() { api_as GITLAB_TOKEN "$1"; }
 
 # PUT on the API with the owner token and form fields from stdin.
 api_put() {
   local path=$1
-  { printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_TOKEN"; cat; } | curl --config - -fsS -X PUT "$api_url/$path" >/dev/null
+  { printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_TOKEN"; cat; } | curl_api --config - -fsS -X PUT "$api_url/$path" >/dev/null
 }
 
 # Retries a command for up to 30 seconds: new tokens and memberships can take
@@ -208,7 +212,7 @@ assert int(sys.argv[1]) in [p["id"] for p in json.load(sys.stdin)], "tools proje
   code=$(tofu -chdir="$dir" output -json pipeline_trigger_tokens | python3 -I -c '
 import json, sys
 print("form = \"token=%s\"\nform = \"ref=it-no-such-ref\"" % json.load(sys.stdin)[sys.argv[1]])' "$tree/team/api:$tree" |
-    curl --config - -s -o /dev/null -w '%{http_code}' "$api_url/projects/$api_id/trigger/pipeline")
+    curl_api --config - -s -o /dev/null -w '%{http_code}' "$api_url/projects/$api_id/trigger/pipeline")
   [ "$code" = 400 ] || fail "trigger token check (HTTP $code)"
   log "pipeline trigger token authenticates"
 
