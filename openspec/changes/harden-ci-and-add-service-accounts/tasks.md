@@ -122,10 +122,12 @@
 
 ## 9. Integration fixture against the sandbox (design 12)
 
-- [ ] 9.1 `tests/integration/main.tf` owner mode: the objects of design 12. `run.sh`: the API assertions of design 12 and the seeded-file edit followed by a third empty plan. Verify `bash -n`, ShellCheck, and a mock-provider plan of the fixture in owner, least and Free modes without warnings.
-- [ ] 9.2 Run `MODE=owner tests/integration/run.sh` against `leminnov/test` (maintainer approved real runs for this change). Fold any read-back finding into the code, its unit test and its spec. Verify PASS, then that nothing suffixed with the run is left in `leminnov/test`.
-- [ ] 9.3 One-off upgrade check: apply a small v13.0.0 tree to the sandbox, plan it with this branch, then destroy. Verify the plan is empty, and report it here.
-- [ ] 9.4 `TESTING.md` (what owner mode now proves) and the README compatibility row (server floor 18 for service accounts; what was applied). Verify `pre-commit run -a`.
+- [x] 9.1 `tests/integration/main.tf` owner mode: the objects of design 12. `run.sh`: the API assertions of design 12 and the seeded-file edit followed by a third empty plan. Verify `bash -n`, ShellCheck, and a mock-provider plan of the fixture in owner, least and Free modes without warnings.
+- [x] 9.2 Run `MODE=owner tests/integration/run.sh` against `leminnov/test` (maintainer approved real runs for this change). Fold any read-back finding into the code, its unit test and its spec. Verify PASS, then that nothing suffixed with the run is left in `leminnov/test`.
+  - 2026-10-25, `MODE=owner` against `leminnov/test`: PASS on the first run. Service accounts (existing subgroup, created subgroup, project) read `team/api` through their memberships; hardened CI settings read back; freeze period, secure file, runner and deploy-key enablement, package and container repository rules, CODEOWNERS on `main` and `develop`, and the agent with its `config.yaml` and `glagent-` token were all present; the second plan and the plan after the seeded-file edit were empty. Nothing was left in `leminnov/test` afterwards.
+- [x] 9.3 One-off upgrade check: apply a small v13.0.0 tree to the sandbox, plan it with this branch, then destroy. Verify the plan is empty, and report it here.
+  - 2026-10-25: a tree applied with `v13.0.0` (group, project with a variable and a label) then planned with this branch: `No changes. Your infrastructure matches the configuration.` (exit 0), then destroyed.
+- [x] 9.4 `TESTING.md` (what owner mode now proves) and the README compatibility row (server floor 18 for service accounts; what was applied). Verify `pre-commit run -a`.
 
 ## 10. Project instructions (AGENTS.md, OpenSpec config)
 

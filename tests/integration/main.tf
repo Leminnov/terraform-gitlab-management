@@ -94,10 +94,22 @@ module "gitlab_management" {
   # Creating subgroups needs the Owner role: the tree is built in owner mode only.
   parent_group_id = var.mode == "owner" ? tonumber(var.group_id) : null
 
+  # A service account of the existing intermediate subgroup (the sandbox
+  # group), invited into the tree. Top-level accounts are unit-tested only.
+  service_accounts = {
+    for k, v in {
+      "it-${var.suffix}" = { group = var.group_id, tokens = { ci = { scopes = ["read_api"], expires_at = var.expires_on } } }
+    } : k => v if var.mode == "owner"
+  }
+
   groups = {
     for k, v in {
-      (local.tree)             = local.throwaway_group
-      "${local.tree}/team"     = local.throwaway_group
+      (local.tree) = merge(local.throwaway_group, {
+        members = { bot = { service_account = "it-${var.suffix}", access_level = "reporter" } }
+      })
+      "${local.tree}/team" = merge(local.throwaway_group, {
+        service_accounts = { deployer = { tokens = { ci = { scopes = ["read_api"], rotation_configuration = { expiration_days = 30, rotate_before_days = 7 } } } } }
+      })
       "${local.tree}/team/svc" = local.throwaway_group
     } : k => v if var.mode == "owner"
   }
@@ -116,10 +128,33 @@ module "gitlab_management" {
         shared_with       = { svc = { group = "${local.tree}/team/svc", access_level = "developer" } }
         # The owner token's user inherits Owner from the sandbox group, and
         # GitLab refuses a membership below an inherited one.
-        members             = { owner = { user_id = var.member_user_id, access_level = "owner" } }
+        members = {
+          owner    = { user_id = var.member_user_id, access_level = "owner" }
+          deployer = { service_account = "${local.tree}/team:deployer", access_level = "reporter" }
+          release  = { service_account = "${local.tree}/team/api:release", access_level = "reporter" }
+        }
+        service_accounts    = { release = { tokens = { ci = { scopes = ["read_api"], expires_at = var.expires_on } } } }
         job_token_allowlist = { projects = ["${local.tree}/tools"] }
+        ci                  = { hardening_enabled = true, delete_pipelines_in_seconds = 31536000 }
+        freeze_periods      = { weekend = { freeze_start = "0 18 * * 5", freeze_end = "0 6 * * 1" } }
+        secure_files        = { "it.txt" = var.sentinel }
+        # Unlocked and paused: shared with tools, never picks a job.
+        runners                        = { build = { tag_list = ["it-${var.suffix}"], paused = true } }
+        package_protection_rules       = { npm = { package_type = "npm", package_name_pattern = "@it/*" } }
+        container_protection_rules     = { all = { path_pattern = "*" } }
+        container_tag_protection_rules = { release = { tag_name_pattern = "^v[0-9]+" } }
+        # No .gitlab-ci.yml: commits must not start pipelines on the sandbox.
+        files = {
+          CODEOWNERS       = { content = "# Managed by the integration fixture\n" }
+          "docs/README.md" = { content = "Seeded once\n", managed = false }
+        }
+        kubernetes_agents = { it = { ci_access = { groups = [local.tree] } } }
       })
-      "${local.tree}/tools" = local.throwaway_project
+      "${local.tree}/tools" = merge(local.throwaway_project, {
+        enabled_runners             = ["${local.tree}/team/api:build"]
+        enabled_deploy_keys         = ["${local.tree}/team/api:it"]
+        container_expiration_policy = {}
+      })
     } : k => v if var.mode == "owner"
   }
 
@@ -255,6 +290,23 @@ output "pipeline_trigger_tokens" {
   description = "Pipeline trigger tokens of the tree, read by run.sh"
   value       = module.gitlab_management.pipeline_trigger_tokens
   sensitive   = true
+}
+
+output "service_account_tokens" {
+  description = "Service account tokens of the run, read by run.sh"
+  value       = module.gitlab_management.service_account_tokens
+  sensitive   = true
+}
+
+output "kubernetes_agent_tokens" {
+  description = "Kubernetes agent tokens of the run, read by run.sh"
+  value       = module.gitlab_management.kubernetes_agent_tokens
+  sensitive   = true
+}
+
+output "gitlab_runners" {
+  description = "Runners of the run, read by run.sh"
+  value       = module.gitlab_management.gitlab_runners
 }
 
 output "group_variables_ids" {
