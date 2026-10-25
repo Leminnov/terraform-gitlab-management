@@ -48,7 +48,7 @@ The module SHALL expose exactly these outputs:
 - `service_accounts`, `service_account_tokens`;
 - `kubernetes_agent_tokens`.
 
-Every output carrying a token SHALL be `sensitive`, and no output SHALL echo a variable value or a secure file.
+Every output carrying a token SHALL be `sensitive`, and none SHALL echo a variable value or a secure file.
 
 #### Scenario: Removed output referenced
 - **WHEN** a caller upgrading from v12 references `module.<name>.all_tokens` or `module.<name>.group_variables`
