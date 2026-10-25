@@ -116,9 +116,9 @@
 
 ## 8. Guardrails (design 10)
 
-- [ ] 8.1 `checks.tf`: `public_jobs` and `job_token_push`; `token_lifetime` extended to service-account tokens and `rotation_configuration.expiration_days`. Verify `tofu validate`.
-- [ ] 8.2 `tests/guardrails.tftest.hcl`: one run per new check, the two new `token_lifetime` cases, and the clean run extended with service accounts, rotation and the default CI settings. Verify `mise run test` and the check mutation (neutralise each condition and drop each source line; the suite fails).
-- [ ] 8.3 README Security Considerations lists the new warnings. CHANGELOG Added. Verify `pre-commit run -a` and that `examples/complete` raises no warning.
+- [x] 8.1 `checks.tf`: `public_jobs` and `job_token_push`; `token_lifetime` extended to service-account tokens and `rotation_configuration.expiration_days`. Verify `tofu validate`.
+- [x] 8.2 `tests/guardrails.tftest.hcl`: one run per new check, the two new `token_lifetime` cases, and the clean run extended with service accounts, rotation and the default CI settings. Verify `mise run test` and the check mutation (neutralise each condition and drop each source line; the suite fails).
+- [x] 8.3 README Security Considerations lists the new warnings. CHANGELOG Added. Verify `pre-commit run -a` and that `examples/complete` raises no warning.
 
 ## 9. Integration fixture against the sandbox (design 12)
 

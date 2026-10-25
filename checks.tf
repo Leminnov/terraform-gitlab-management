@@ -19,10 +19,26 @@ locals {
     { for k, v in local.deploy_keys : "deploy_keys[\"${k}\"]" => v.expires_at if can(regex(local.rfc3339_regex, v.expires_at)) },
     { for k, v in local.group_access_tokens : "gitlab_group_access_token[\"${k}\"]" => "${v.expires_at}T00:00:00Z" if can(regex(local.day_regex, v.expires_at)) },
     { for k, v in local.project_access_tokens : "gitlab_project_access_token[\"${k}\"]" => "${v.expires_at}T00:00:00Z" if can(regex(local.day_regex, v.expires_at)) },
+    { for k, v in merge(local.group_service_account_tokens, local.project_service_account_tokens) : "service_accounts[\"${v.account}\"].tokens[\"${v.name}\"]" => "${v.expires_at}T00:00:00Z" if can(regex(local.day_regex, v.expires_at)) },
+  )
+
+  # Rotating tokens: their lifetime is expiration_days.
+  token_rotation_days = merge(
+    { for k, v in local.group_access_tokens : "gitlab_group_access_token[\"${k}\"]" => v.rotation_configuration.expiration_days if v.rotation_configuration != null },
+    { for k, v in local.project_access_tokens : "gitlab_project_access_token[\"${k}\"]" => v.rotation_configuration.expiration_days if v.rotation_configuration != null },
+    { for k, v in merge(local.group_service_account_tokens, local.project_service_account_tokens) : "service_accounts[\"${v.account}\"].tokens[\"${v.name}\"]" => v.rotation_configuration.expiration_days if v.rotation_configuration != null },
   )
 
   # 8784h = 366 days: one year (secrets-rotation) plus date granularity.
-  long_lived_tokens = sort([for k, expiry in local.token_expiries : k if timecmp(expiry, timeadd(plantimestamp(), "8784h")) > 0])
+  long_lived_tokens = sort(concat(
+    [for k, expiry in local.token_expiries : k if timecmp(expiry, timeadd(plantimestamp(), "8784h")) > 0],
+    [for k, days in local.token_rotation_days : k if days > 366],
+  ))
+
+  # Only an explicit true: hardening sends false, and null sends nothing.
+  public_job_projects = sort([for k, v in local.project_args : "projects[\"${k}\"].ci.public_jobs" if v.ci.public_jobs == true])
+
+  job_token_push_projects = sort([for k, v in local.project_args : "projects[\"${k}\"].ci.push_repository_for_job_token_allowed" if v.ci.push_repository_for_job_token_allowed == true])
 
   public_entries = sort(concat(
     [for k, v in var.groups : "groups[\"${k}\"]" if v.visibility == "public"],
@@ -93,5 +109,19 @@ check "deploy_key_write_access" {
   assert {
     condition     = length(local.writable_deploy_keys) == 0
     error_message = "Deploy keys with write access: ${join(", ", local.writable_deploy_keys)}. Set can_push = false unless the machine must push, and protect the branches it pushes to."
+  }
+}
+
+check "public_jobs" {
+  assert {
+    condition     = length(local.public_job_projects) == 0
+    error_message = "Projects with public job logs and artifacts: ${join(", ", local.public_job_projects)}. Non-members of an internal or public project can read them; set public_jobs = false."
+  }
+}
+
+check "job_token_push" {
+  assert {
+    condition     = length(local.job_token_push_projects) == 0
+    error_message = "Projects accepting pushes authenticated with a CI/CD job token: ${join(", ", local.job_token_push_projects)}. Every pipeline the job token allowlist admits can then push; set push_repository_for_job_token_allowed = false unless a pipeline must push."
   }
 }

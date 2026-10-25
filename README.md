@@ -170,14 +170,16 @@ Back up the state, then follow the "Changed (breaking)" and "Removed" upgrade no
 
 1. CI variable values, schedule variable values, webhook tokens and every token GitLab creates land in state, since the provider has no write-only arguments for them: keep the state in an encrypted, access-restricted backend. [SECURITY.md](SECURITY.md) lists each one with its mitigation.
 2. Values are redacted in plan output (`(sensitive value)`); pass secrets from `TF_VAR_*` or a secret store, never from a committed file.
-3. Seven plan-time warnings (`check` blocks in `checks.tf`) flag configurations GitLab accepts but that weaken security, naming the entries and never a value:
+3. Nine plan-time warnings (`check` blocks in `checks.tf`) flag configurations GitLab accepts but that weaken security, naming the entries and never a value:
    - `secret_variables_masked_and_protected`: a variable, standalone or nested, whose key contains `TOKEN`, `PASSWORD`, `PASSWD`, `SECRET`, `PRIVATE_KEY`, `API_KEY` or `CREDENTIAL` (any case) is not both masked and protected;
-   - `token_lifetime`: a deploy token, access token or deploy key expires more than one year after the plan;
+   - `token_lifetime`: a deploy token, access token, service-account token or deploy key expires more than one year after the plan, or rotates with `expiration_days` above 366;
    - `access_token_privilege`: an access token has `access_level = "owner"`, or no level (GitLab then grants `maintainer`);
    - `public_visibility`: a created group or project is public;
    - `protected_branch_force_push`: a protected branch allows force push;
    - `webhook_ssl_verification`: a project or group webhook does not verify TLS;
-   - `deploy_key_write_access`: a deploy key can push.
+   - `deploy_key_write_access`: a deploy key can push;
+   - `public_jobs`: a created project explicitly sets `ci.public_jobs = true`;
+   - `job_token_push`: a created project lets CI/CD job tokens push to its repository.
 4. Every deploy token, access token and deploy key needs an expiry; rotate them before it (see [SECURITY.md](SECURITY.md)).
 5. Created groups and projects default to private, with `main` and `develop` protected, `v*` tags protected and merges gated on a green pipeline; loosening any of them is an explicit input.
 
