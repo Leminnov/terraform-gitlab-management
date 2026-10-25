@@ -7,6 +7,10 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+### Fixed
+
+- The `gitlab_runners` output reported the wrong `project_id` for a project runner shared through `enabled_runners`, and changed once after the first refresh. It now reports the runner's own project, taken from the configuration (provider 19.5 reads it back as the project it was shared with).
+
 ## [13.1.0] - 2026-10-25
 
 ### Added

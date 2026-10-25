@@ -710,6 +710,7 @@ run "runner_and_deploy_key_shared_with_another_project" {
       gitlab_project_runner_enablement.this["tools:platform/api:build"].runner_id == 5000,
       gitlab_project_runner_enablement.this["tools:77"].runner_id == 77,
       gitlab_project_runner_enablement.this["tools:77"].project == "2000",
+      output.gitlab_runners["platform/api:build"].project_id == 2000,
     ])
     error_message = "Runner enablements must be keyed \"<project key>:<runner key or ID>\" and resolve the runner ID."
   }

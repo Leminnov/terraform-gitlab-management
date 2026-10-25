@@ -127,11 +127,13 @@ output "gitlab_runners" {
   description = "Runners keyed like the gitlab_runners input, or \"<owner key>:<name>\" for created groups and projects: id (the GitLab runner ID), runner_type, description, group_id, project_id, access_level, tag_list, maximum_timeout, paused, untagged and locked"
   value = {
     for k, v in gitlab_user_runner.this : k => {
-      id              = v.id
-      runner_type     = v.runner_type
-      description     = v.description
-      group_id        = v.group_id
-      project_id      = v.project_id
+      id          = v.id
+      runner_type = v.runner_type
+      description = v.description
+      group_id    = v.group_id
+      # From the configuration: once a runner is shared, provider 19.5 reads
+      # its project_id back as another project (ci.tf).
+      project_id      = local.runners[k].project_id == null ? null : tonumber(local.runners[k].project_id)
       access_level    = v.access_level
       tag_list        = v.tag_list
       maximum_timeout = v.maximum_timeout

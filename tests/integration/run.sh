@@ -118,7 +118,8 @@ second_plan_empty() {
   local rc=0
   tofu -chdir="$dir" plan -no-color -detailed-exitcode >"$work/plan2.txt" || rc=$?
   [ "$rc" -eq 0 ] || {
-    sed -n '/will be\|must be/,+12p' "$work/plan2.txt" | grep -vF -e "$sentinel" -e "$signing_token" >&2 || true
+    { sed -n '/will be\|must be/,+12p' "$work/plan2.txt"; sed -n '/Changes to Outputs/,/^$/p' "$work/plan2.txt"; } |
+      grep -vF -e "$sentinel" -e "$signing_token" >&2 || true
     fail "second plan is not empty (exit $rc)"
   }
   log "second plan empty"
