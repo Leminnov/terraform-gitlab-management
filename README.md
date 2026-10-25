@@ -36,7 +36,7 @@ Creating groups under `parent_group_id` needs the Owner role on it; the token al
 
 | Module | OpenTofu | Provider | GitLab | Examples applied |
 |--------|----------|----------|--------|------------------|
-| 13.1.0 | 1.11.14, 1.13.2 (validate and unit tests); 1.13.2 (integration) | 19.5.0 | gitlab.com (Free), GitLab 18+ for subgroup and project service accounts | Integration fixture applied 2026-10-25: `owner` (tree with service accounts at the existing-subgroup, subgroup and project level, CI hardening, freeze period, secure file, shared runner and deploy key, registry rules, managed and seeded files, Kubernetes agent; empty second plan, also after a seeded-file edit); a v13.0.0 tree planned with this version shows no change; top-level service accounts, access tokens and Premium settings untested; `least` not yet run |
+| 13.1.0, 13.1.1 | 1.11.14, 1.13.2 (validate and unit tests); 1.13.2 (integration) | 19.5.0 | gitlab.com (Free), GitLab 18+ for subgroup and project service accounts | Integration fixture applied 2026-10-25: `owner` (tree with service accounts at the existing-subgroup, subgroup and project level, CI hardening, freeze period, secure file, shared runner and deploy key, registry rules, managed and seeded files, Kubernetes agent; empty second plan, also after a seeded-file edit); a v13.0.0 tree planned with this version shows no change; top-level service accounts, access tokens and Premium settings untested; `least` not yet run |
 | 13.0.0 | 1.11.14, 1.13.2 (validate and unit tests); 1.13.2 (integration) | 19.5.0 | gitlab.com (Free) | Integration fixture applied 2026-10-23: `owner` (three-level tree, nested objects and standalone resources, empty second plan) and `upgrade` from v12.0.0 (deploy tokens moved, empty second plan); access tokens skipped (Premium on gitlab.com); `least` not yet run; Premium settings untested |
 
 CI validates every example and runs the unit suite on OpenTofu 1.11.14 and 1.13.2. `instance_type` runners need an instance administrator token and are covered by the unit suite only.
@@ -50,7 +50,7 @@ CI validates every example and runs the unit suite on OpenTofu 1.11.14 and 1.13.
 provider "gitlab" {}
 
 module "gitlab_management" {
-  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.0"
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.1"
 
   group_variables = {
     pipeline_log_level = {
@@ -66,7 +66,7 @@ module "gitlab_management" {
 
 ```hcl
 module "gitlab_management" {
-  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.0"
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.1"
 
   parent_group_id = 6055239 # an existing group you own
 
@@ -91,7 +91,7 @@ module "gitlab_management" {
 
 ```hcl
 module "gitlab_management" {
-  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.0"
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.1"
 
   deploy_tokens = {
     registry = {
@@ -140,7 +140,7 @@ Every input is a map and defaults to `{}`; leave an input out, or set it to `{}`
 
 ```hcl
 module "gitlab_management" {
-  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.0"
+  source = "git::https://gitlab.com/leminnov/terraform/modules/gitlab-management.git?ref=v13.1.1"
 
   gitlab_runners = var.enable_runner ? {
     ci = {
