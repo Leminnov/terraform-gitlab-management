@@ -164,7 +164,10 @@ cmd_prepare() {
   grep -qxF '## [Unreleased]' CHANGELOG.md || die "CHANGELOG.md has no '## [Unreleased]' section"
   local unreleased
   unreleased=$(awk 'index($0,"## [Unreleased]")==1{f=1;next} f&&/^## \[/{exit} f' CHANGELOG.md)
-  printf '%s' "$unreleased" | grep -q '[^[:space:]]' || die "the Unreleased section of CHANGELOG.md is empty: nothing to release"
+  # Not `printf ... | grep -q`: under pipefail, grep -q exiting on its first match kills
+  # printf with SIGPIPE once the section outgrows the pipe buffer, and the pipeline reports
+  # a non-empty section as empty. tr consumes all input.
+  [ -n "$(printf '%s' "$unreleased" | tr -d '[:space:]')" ] || die "the Unreleased section of CHANGELOG.md is empty: nothing to release"
 
   info "releasing $tag (previous: ${last:-none})"
   if $checks; then

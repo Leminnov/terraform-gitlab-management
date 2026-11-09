@@ -7,6 +7,10 @@ project follows [Semantic Versioning](https://semver.org). Sections before
 
 ## [Unreleased]
 
+### Fixed
+
+- `mise run release` no longer refuses a long `## [Unreleased]` section as empty: under `pipefail`, `grep -q` stopping at its first match failed the check.
+
 ## [13.1.1] - 2026-10-25
 
 ### Fixed
